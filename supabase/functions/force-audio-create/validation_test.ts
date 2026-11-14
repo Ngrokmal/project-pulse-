@@ -1,6 +1,6 @@
 // Pure validation tests for force-audio-create (§5 limits, URL trust).
 import { assertEquals } from "jsr:@std/assert@1";
-import { LIMITS, validate } from "./index.ts";
+import { LIMITS, validate } from "./lib.ts";
 
 const CALLER = "11111111-1111-4111-8111-111111111111";
 const OTHER = "22222222-2222-4222-8222-222222222222";
