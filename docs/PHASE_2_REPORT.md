@@ -116,6 +116,32 @@ three-tab shell. Debug-only design gallery stays behind `kDebugMode`.
 * `db-verify.yml` (manual `workflow_dispatch`) → runs both **live** suites
   against the real project. It creates and deletes one throwaway account.
 
+### CI evidence (commit `7d63afc` + fingerprint fix)
+
+```
+Migrations & RLS         success      PostgreSQL 18.6 → 0001/0002/0003 → ALL RLS TESTS PASSED
+Analyze & test           success
+Build release APK        success      artifact pulse-release-apk (29.6 MB)
+  V3.0 Signer: certificate DN: CN=Pulse Messenger, OU=Mobile, O=Pulse, L=Chattogram, ST=Chittagong, C=BD
+  expected: 801b67a45a40bab8d2f8438c2c55452bbebd090471218529bc7b73e0c92d1123
+  actual  : 801b67a45a40bab8d2f8438c2c55452bbebd090471218529bc7b73e0c92d1123
+  signature verified against the published upload certificate
+```
+
+Manual `Live database verification` workflow run on the same commit:
+
+```
+26 / 26 assertions passed
+rolled back — no rows persisted
+===== LIVE API: 26 passed, 0 failed =====
+cleanup: deleted throwaway user 2121c525-cb6c-440c-bbba-6a72d5031585
+```
+
+Post-run residue on the production database: `auth.users=0 profiles=0 devices=0 tokens=0`.
+
+Note: the `migrations` job runs on PostgreSQL 18 while the project runs 17 —
+the same migrations pass on both, which is the portability check we wanted.
+
 ---
 
 ## 6. Open items (blocked on things only you can do)
