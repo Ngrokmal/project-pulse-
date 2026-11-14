@@ -86,6 +86,14 @@ class _ProfileBody extends ConsumerWidget {
             Text('Profile', style: AppTypography.headlineMedium),
             const Spacer(),
             IconButton(
+              tooltip: 'Settings',
+              onPressed: () => context.push('/settings'),
+              icon: const Icon(
+                Icons.settings_outlined,
+                color: AppColors.textMuted,
+              ),
+            ),
+            IconButton(
               tooltip: 'Edit profile',
               onPressed: () => context.push('/profile/edit'),
               icon: const Icon(Icons.edit_outlined, color: AppColors.brand600),

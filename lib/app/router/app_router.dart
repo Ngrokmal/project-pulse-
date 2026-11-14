@@ -6,6 +6,7 @@ import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
 import '../../features/calls/presentation/call_screen.dart';
 import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/chat/presentation/create_group_screen.dart';
 import '../../features/force_audio/presentation/force_audio_screen.dart';
 import '../../features/diagnostics/presentation/connection_screen.dart';
@@ -52,6 +53,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         ),
       ),
       GoRoute(
+        path: '/settings',
+        name: 'settings',
+        pageBuilder: (context, state) => _fade(state, const SettingsScreen()),
+      ),
+      GoRoute(
         path: '/call/:id',
         name: 'call',
         pageBuilder: (context, state) =>
@@ -93,12 +99,20 @@ final routerProvider = Provider<GoRouter>((ref) {
   );
 });
 
+/// Set from Settings ("Reduce motion"). A ValueNotifier keeps the router
+/// instance stable — rebuilding GoRouter would reset the navigation stack.
+final reduceMotionNotifier = ValueNotifier<bool>(false);
+
 CustomTransitionPage<void> _fade(GoRouterState state, Widget child) {
+  final reduceMotion = reduceMotionNotifier.value;
   return CustomTransitionPage<void>(
     key: state.pageKey,
     child: child,
-    transitionDuration: const Duration(milliseconds: 260),
+    transitionDuration: reduceMotion
+        ? Duration.zero
+        : const Duration(milliseconds: 260),
     transitionsBuilder: (context, animation, secondary, child) {
+      if (reduceMotion) return child;
       final curved = CurvedAnimation(
         parent: animation,
         curve: const Cubic(0.22, 1, 0.36, 1),

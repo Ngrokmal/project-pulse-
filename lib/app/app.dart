@@ -5,6 +5,9 @@ import '../core/config/app_config.dart';
 import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
 import '../features/calls/application/call_controller.dart';
+import '../features/chat/application/chat_controller.dart';
+import '../features/settings/domain/app_settings.dart';
+import 'lifecycle.dart';
 import '../features/notifications/application/push_message_controller.dart';
 import '../features/notifications/domain/push_message.dart';
 import '../features/shell/presentation/config_missing_screen.dart';
@@ -27,6 +30,23 @@ class PulseApp extends ConsumerWidget {
     }
 
     final router = ref.watch(routerProvider);
+    // Preferences drive what the app shows: text size and motion are applied at
+    // the root so every screen (including dialogs) honours them.
+    final appSettings =
+        ref.watch(settingsProvider).value ?? const AppSettings();
+    reduceMotionNotifier.value = appSettings.reduceMotion;
+    ref.listen<AsyncValue<AppSettings>>(settingsProvider, (_, next) {
+      final value = next.value;
+      if (value != null) reduceMotionNotifier.value = value.reduceMotion;
+    });
+    // Resuming after a long sleep means the caches are stale; refresh once,
+    // throttled, so a flickering phone does not hammer the network (§9).
+    if (ref.read(appLifecycleProvider) == AppLifecycleState.resumed) {
+      ref.read(resumeRefresherProvider).maybeRun(DateTime.now(), [
+        () => ref.invalidate(conversationsProvider),
+        () => ref.invalidate(incomingCallProvider),
+      ]);
+    }
 
     // A tapped Force Audio notification (including one that launched the app from
     // a terminated state) takes over the screen. The alert id is verified against
@@ -62,8 +82,10 @@ class PulseApp extends ConsumerWidget {
       builder: (context, child) {
         // Never let system font scaling break layout completely; keep text
         // readable while preventing extreme overflow (§15).
-        final scaler = MediaQuery.textScalerOf(context)
-            .clamp(minScaleFactor: 0.9, maxScaleFactor: 1.6);
+        final scaler = TextScaler.linear(appSettings.textScale).clamp(
+          minScaleFactor: AppSettings.minTextScale,
+          maxScaleFactor: AppSettings.maxTextScale,
+        );
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaler),
           child: child ?? const SizedBox.shrink(),
