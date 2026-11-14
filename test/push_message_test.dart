@@ -77,6 +77,37 @@ void main() {
       expect(m.alertId, 'alert-9');
     });
 
+    test('a foreground push is not "opened"', () {
+      final m = PushMessage.fromRemote(
+        RemoteMessage(
+          data: const {'kind': 'force_audio', 'force_audio_alert_id': 'a1'},
+        ),
+      );
+      expect(m.opened, isFalse, reason: 'a banner is not a tap');
+    });
+
+    test('a tapped notification is marked opened, with its alert id', () {
+      final m = PushMessage.fromRemote(
+        RemoteMessage(
+          data: const {'kind': 'force_audio', 'force_audio_alert_id': 'a1'},
+        ),
+        opened: true,
+      );
+      expect(m.opened, isTrue);
+      expect(m.kind, PushKind.forceAudio);
+      expect(m.alertId, 'a1');
+    });
+
+    test('a plain chat tap is opened but is not force audio', () {
+      final m = PushMessage.fromRemote(
+        RemoteMessage(data: const {'kind': 'message', 'chat_id': 'c1'}),
+        opened: true,
+      );
+      expect(m.opened, isTrue);
+      expect(m.kind, PushKind.message);
+      expect(m.alertId, isNull);
+    });
+
     test('never renders an empty title', () {
       final m = PushMessage.fromRemote(RemoteMessage(data: const {}));
       expect(m.title, 'Pulse');

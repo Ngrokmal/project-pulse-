@@ -32,14 +32,14 @@ class PushMessageController extends Notifier<PushMessage?> {
         state = message;
       }),
       service.openedMessages.listen((m) {
-        final message = PushMessage.fromRemote(m);
+        final message = PushMessage.fromRemote(m, opened: true);
         _log.info('push_opened', data: {'kind': message.kind.name});
         state = message;
       }),
     ];
     // A tap that launched the app from a terminated state.
     service.initialMessage().then((m) {
-      if (m != null) state = PushMessage.fromRemote(m);
+      if (m != null) state = PushMessage.fromRemote(m, opened: true);
     });
 
     ref.onDispose(() {

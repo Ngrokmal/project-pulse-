@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -9,8 +10,8 @@ import '../domain/push_message.dart';
 
 /// In-app presentation of a push that arrived while Pulse is open. Android shows
 /// nothing by itself in the foreground, so this is the delivery surface (§31).
-/// Force Audio pushes are labelled and routed to the Inbox for now; the
-/// takeover screen lands with the Force Audio work.
+/// Tapping a Force Audio banner opens the takeover screen; anything else opens
+/// the inbox.
 class PushBanner extends ConsumerWidget {
   const PushBanner({super.key, this.onOpenInbox});
 
@@ -34,7 +35,12 @@ class PushBanner extends ConsumerWidget {
         child: InkWell(
           borderRadius: AppRadius.cardRadius,
           onTap: () {
+            final alertId = message.alertId;
             ref.read(pushMessageProvider.notifier).dismiss();
+            if (isForceAudio && alertId != null && alertId.isNotEmpty) {
+              context.push('/force-audio/$alertId');
+              return;
+            }
             onOpenInbox?.call();
           },
           child: Container(

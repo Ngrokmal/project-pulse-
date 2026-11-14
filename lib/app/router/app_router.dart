@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
 import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/force_audio/presentation/force_audio_screen.dart';
 import '../../features/diagnostics/presentation/connection_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
@@ -46,6 +47,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _fade(
           state,
           ChatScreen(conversationId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
+        path: '/force-audio/:alertId',
+        name: 'force-audio',
+        pageBuilder: (context, state) => _fade(
+          state,
+          ForceAudioScreen(alertId: state.pathParameters['alertId']!),
         ),
       ),
       GoRoute(

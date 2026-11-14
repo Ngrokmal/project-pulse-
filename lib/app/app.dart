@@ -2,9 +2,14 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/config/app_config.dart';
+import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
+import '../features/notifications/application/push_message_controller.dart';
+import '../features/notifications/domain/push_message.dart';
 import '../features/shell/presentation/config_missing_screen.dart';
 import 'router/app_router.dart';
+
+final _log = AppLogger('app');
 
 class PulseApp extends ConsumerWidget {
   const PulseApp({super.key});
@@ -21,6 +26,20 @@ class PulseApp extends ConsumerWidget {
     }
 
     final router = ref.watch(routerProvider);
+
+    // A tapped Force Audio notification (including one that launched the app from
+    // a terminated state) takes over the screen. The alert id is verified against
+    // the server by that screen before anything is downloaded or played.
+    ref.listen<PushMessage?>(pushMessageProvider, (previous, next) {
+      if (next == null || !next.opened) return;
+      if (next.kind != PushKind.forceAudio) return;
+      final alertId = next.alertId;
+      if (alertId == null || alertId.isEmpty) return;
+      _log.info('force_audio_open_requested');
+      ref.read(pushMessageProvider.notifier).dismiss();
+      router.go('/force-audio/$alertId');
+    });
+
     return MaterialApp.router(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,

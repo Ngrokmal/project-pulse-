@@ -31,6 +31,7 @@ class PushMessage {
     this.alertId,
     this.chatId,
     this.messageId,
+    this.opened = false,
   });
 
   final PushKind kind;
@@ -40,9 +41,13 @@ class PushMessage {
   final String? chatId;
   final String? messageId;
 
+  /// True when the user tapped the notification (or the app was launched by it).
+  /// A foreground push is *not* opened — it only shows the in-app banner.
+  final bool opened;
+
   /// Reads a [RemoteMessage] defensively: pushes can arrive data-only, in which
   /// case the title/body live in `data` instead of `notification`.
-  factory PushMessage.fromRemote(RemoteMessage message) {
+  factory PushMessage.fromRemote(RemoteMessage message, {bool opened = false}) {
     final data = message.data;
     final notification = message.notification;
     final title = (notification?.title ?? data['title']?.toString() ?? '')
@@ -55,6 +60,7 @@ class PushMessage {
       alertId: data['force_audio_alert_id']?.toString(),
       chatId: data['chat_id']?.toString(),
       messageId: message.messageId,
+      opened: opened,
     );
   }
 
