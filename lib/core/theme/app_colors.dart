@@ -55,6 +55,10 @@ class AppColors {
   static const darkTextPrimary = Color(0xFFF5F4FA);
   static const darkTextMuted = Color(0xFFA5A2B8);
 
+  /// Counterparty bubble and input fill (#F3F0FD, design/tokens.json).
+  static const bubbleOther = Color(0xFFF3F0FD);
+  static const inputFill = bubbleOther;
+
   // Gradients — the signature of the product
   static const gradientStart = Color(0xFF7B3FF2);
   static const gradientEnd = Color(0xFF3768D2);

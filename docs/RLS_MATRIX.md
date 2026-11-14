@@ -125,3 +125,21 @@ Postmark) — see `docs/PHASE_2_REPORT.md` → "Open items".
    first fixture token was 15 characters and was rejected. Real FCM tokens are
    ~150+ characters, so the constraint is correct; the harness fixtures were
    wrong. Client code must never insert a placeholder token.
+
+---
+
+## Chat tables (migration `0004_chat.sql`)
+
+| Table | anon | authenticated (member) | authenticated (outsider) | service_role |
+|---|---|---|---|---|
+| `conversations` | ⛔ no privilege | 👁 SELECT | ⛔ 0 rows | ✅ all |
+| `conversation_members` | ⛔ no privilege | 👁 SELECT, UPDATE (`last_read_at` only) | ⛔ 0 rows | ✅ all |
+| `messages` | ⛔ no privilege | ✅ SELECT / INSERT (own sender) / UPDATE (own) / DELETE (own) | ⛔ 0 rows | ✅ all |
+
+`start_direct_conversation(uuid)` is SECURITY DEFINER, idempotent for a pair of
+users and executable by `authenticated` only. Messages are never hard-deleted by
+clients; `deleted_at` is the only delete path and RLS filters rows instead of
+raising, which the tests assert explicitly. Sending additionally requires
+`is_account_active(auth.uid())`, so a banned account cannot post even with a valid
+token. Verified live: **19 / 19** SQL assertions and the chat section of the
+**54 / 54** API suite.

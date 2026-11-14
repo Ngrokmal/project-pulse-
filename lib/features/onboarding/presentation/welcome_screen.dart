@@ -141,6 +141,20 @@ class WelcomeScreen extends StatelessWidget {
                         ),
                       ),
                     ),
+                    TextButton.icon(
+                      onPressed: () => context.push('/connection'),
+                      icon: Icon(
+                        Icons.network_check_rounded,
+                        size: 14,
+                        color: Colors.white.withValues(alpha: 0.55),
+                      ),
+                      label: Text(
+                        'Trouble connecting? Check the link',
+                        style: AppTypography.caption.copyWith(
+                          color: Colors.white.withValues(alpha: 0.55),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -8,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'app/app.dart';
 import 'core/config/app_config.dart';
 import 'core/platform/firebase_bootstrap.dart';
+import 'features/chat/data/chat_local_store.dart';
 import 'core/logging/app_logger.dart';
 
 final _log = AppLogger('bootstrap');
@@ -27,6 +28,10 @@ Future<void> main() async {
       // Push must come up before the first frame so a cold-start notification
       // tap is not lost. Failure is non-fatal by design.
       await initialiseFirebase();
+
+      // Offline cache + outbox. Failing to open Hive degrades to online-only;
+      // it must never stop the messenger from starting.
+      await ChatLocalStore.open();
 
       if (AppConfig.isBackendConfigured) {
         try {

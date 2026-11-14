@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
@@ -193,13 +194,19 @@ class _ProfileBody extends ConsumerWidget {
           ),
         ],
         _Row(
+          icon: Icons.network_check_rounded,
+          label: 'Connection check',
+          trailing: 'diagnose',
+          onTap: () => context.push('/connection'),
+        ),
+        _Row(
           icon: Icons.info_outline_rounded,
           label: 'About Pulse',
-          trailing: 'v0.1.0',
+          trailing: 'build ${AppConfig.buildLabel}',
           onTap: () => showAboutDialog(
             context: context,
             applicationName: 'Pulse',
-            applicationVersion: '0.1.0 (Phase 2)',
+            applicationVersion: '0.1.0 · build ${AppConfig.buildLabel}',
             children: const [Text('Chat · Call · Connect')],
           ),
         ),

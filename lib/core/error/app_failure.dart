@@ -18,8 +18,18 @@ sealed class AppFailure implements Exception {
 }
 
 class NetworkFailure extends AppFailure {
-  const NetworkFailure({this.timedOut = false, super.correlationId});
+  const NetworkFailure({
+    this.timedOut = false,
+    this.detail,
+    super.correlationId,
+  });
+
   final bool timedOut;
+
+  /// Short, secret-free technical cause (exception type + message). Shown in
+  /// small print and copied by the connection check, so a report from a real
+  /// device is actionable instead of "it says offline".
+  final String? detail;
 
   @override
   String get code => timedOut ? 'network_timeout' : 'network_unavailable';

@@ -17,6 +17,8 @@ dependencies:
   material_ui: ^1.11.0
   firebase_core: ^5.1.0
   firebase_messaging: ^17.0.1
+  hive_ce: ^2.23.3
+  hive_ce_flutter: ^2.5.0
 
 dev_dependencies:
   flutter_test:

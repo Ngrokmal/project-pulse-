@@ -90,8 +90,13 @@ class SupabaseProfileRepository implements ProfileRepository {
     final text = e.toString().toLowerCase();
     if (text.contains('socket') ||
         text.contains('connection') ||
+        text.contains('host lookup') ||
         text.contains('timeout')) {
-      return const NetworkFailure();
+      final trimmed = e.toString();
+      return NetworkFailure(
+        timedOut: text.contains('timeout'),
+        detail: trimmed.length > 160 ? trimmed.substring(0, 160) : trimmed,
+      );
     }
     _log.error(op, error: e);
     return const ServerFailure();

@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../features/diagnostics/presentation/connection_screen.dart';
 import '../error/app_failure.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
@@ -138,6 +139,28 @@ class PulseErrorState extends StatelessWidget {
               style: AppTypography.bodyMedium,
               textAlign: TextAlign.center,
             ),
+            if (failure is NetworkFailure &&
+                (failure as NetworkFailure).detail != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                (failure as NetworkFailure).detail!,
+                style: AppTypography.caption,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+            if (failure is NetworkFailure) ...[
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => const ConnectionScreen(),
+                  ),
+                ),
+                child: const Text('Run a connection check'),
+              ),
+            ],
             if (canRetry) ...[
               const SizedBox(height: 22),
               GradientButton(

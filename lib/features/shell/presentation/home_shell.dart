@@ -5,7 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../account_status/presentation/account_gate.dart';
 import '../../calls/presentation/calls_screen.dart';
 import '../../notifications/presentation/push_banner.dart';
-import '../../inbox/presentation/inbox_screen.dart';
+import '../../chat/presentation/chats_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 
 /// App shell with the reference bottom navigation.
@@ -37,7 +37,7 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             Expanded(
               child: IndexedStack(
                 index: _index,
-                children: const [InboxScreen(), CallsScreen(), ProfileScreen()],
+                children: const [ChatsScreen(), CallsScreen(), ProfileScreen()],
               ),
             ),
           ],

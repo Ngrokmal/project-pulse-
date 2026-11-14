@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
+import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/diagnostics/presentation/connection_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
@@ -39,10 +41,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => _fade(state, const HomeShell()),
       ),
       GoRoute(
+        path: '/chat/:id',
+        name: 'chat',
+        pageBuilder: (context, state) => _fade(
+          state,
+          ChatScreen(conversationId: state.pathParameters['id']!),
+        ),
+      ),
+      GoRoute(
         path: '/profile/edit',
         name: 'edit-profile',
         pageBuilder: (context, state) =>
             _fade(state, const EditProfileScreen()),
+      ),
+      GoRoute(
+        path: '/connection',
+        name: 'connection',
+        pageBuilder: (context, state) => _fade(state, const ConnectionScreen()),
       ),
       GoRoute(
         path: '/design',

@@ -131,7 +131,21 @@ jobs:
           flutter build apk --release \
             --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
             --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
-            --dart-define=CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUD_NAME }}"
+            --dart-define=CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUD_NAME }}" \
+            --dart-define=BUILD_LABEL="$(git rev-parse --short HEAD)-run${{ github.run_number }}"
+
+      - name: Assert the release manifest can reach the network
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)
+          "$AAPT2" dump permissions "$APK" | tee /tmp/perms.txt
+          # Phase 1/2 APKs shipped without INTERNET: every request failed and the
+          # app told the user it was offline. This gate makes that impossible again.
+          for perm in android.permission.INTERNET android.permission.POST_NOTIFICATIONS; do
+            grep -q "$perm" /tmp/perms.txt \
+              || { echo "::error::release manifest is missing $perm"; exit 1; }
+          done
+          echo "network + notification permissions present"
 
       - name: Assert the APK is signed with the Pulse upload key
         run: |

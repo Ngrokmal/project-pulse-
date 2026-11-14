@@ -130,8 +130,9 @@ class SupabaseAuthRepository implements AuthRepository {
     }
     if (msg.contains('socket') ||
         msg.contains('network') ||
-        msg.contains('connection')) {
-      return const NetworkFailure();
+        msg.contains('connection') ||
+        msg.contains('host lookup')) {
+      return NetworkFailure(detail: '${e.code ?? 'auth_error'}: ${e.message}');
     }
     return const AuthFailure(
       'Could not complete that request. Please try again.',

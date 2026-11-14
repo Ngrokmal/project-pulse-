@@ -38,6 +38,14 @@ cleanup() {
       printf '  cleanup: deleted throwaway user %s\n' "$u"
     fi
   done
+  # conversations.created_by is ON DELETE SET NULL and members cascade, so an
+  # empty conversation would otherwise survive the test. Sweep memberless rows.
+  local orphans
+  orphans=$(psql "$SUPABASE_DB_URL" -qtAc "with gone as (
+      delete from public.conversations c
+       where not exists (select 1 from public.conversation_members m where m.conversation_id = c.id)
+      returning 1) select count(*) from gone")
+  printf '  cleanup: removed %s memberless conversation(s)\n' "${orphans:-0}"
 }
 trap cleanup EXIT
 
@@ -150,9 +158,31 @@ check "sign-out simulation deactivates A's token" "200" "$(code PATCH "$SUPABASE
 check "A now has no active tokens" "200" "$(code GET "$SUPABASE_URL/rest/v1/fcm_tokens?select=id&is_active=eq.true" "" "$TOKEN")"
 check "…zero active" "0" "$(jlen)"
 
-echo "== 8. anon (no session) is fenced off =="
+echo "== 8. chat over PostgREST (RPC + messages + realtime-visible rows) =="
+CONV1=$(code POST "$SUPABASE_URL/rest/v1/rpc/start_direct_conversation" "{\"p_other\":\"$UID2_\"}" "$TOKEN" >/dev/null; python3 -c "import json;print(json.load(open('/tmp/api_body')))")
+[ -n "$CONV1" ] && [ "$CONV1" != "None" ] && ok "start_direct_conversation returned an id" || bad "start_direct_conversation" "$CONV1"
+CONV2=$(code POST "$SUPABASE_URL/rest/v1/rpc/start_direct_conversation" "{\"p_other\":\"$UID2_\"}" "$TOKEN" >/dev/null; python3 -c "import json;print(json.load(open('/tmp/api_body')))")
+check "starting the same chat twice is idempotent" "$CONV1" "$CONV2"
+
+MSG_CLIENT="qa-msg-$RANDOM$RANDOM"
+check "A sends a message" "201" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"body\":\"hello from QA\",\"client_id\":\"$MSG_CLIENT\"}" "$TOKEN")"
+check "replaying the same client_id collides (idempotent outbox)" "409" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"body\":\"hello from QA\",\"client_id\":\"$MSG_CLIENT\"}" "$TOKEN")"
+check "conversation preview updated" "hello from QA" "$(code GET "$SUPABASE_URL/rest/v1/conversations?select=last_message_preview&id=eq.$CONV1" "" "$TOKEN" >/dev/null; jget "[0]['last_message_preview']")"
+check "A cannot spoof the sender" "403" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID2_\",\"body\":\"spoof\",\"client_id\":\"qa-spoof-$RANDOM\"}" "$TOKEN")"
+check "A cannot insert into a random conversation" "403" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"00000000-0000-4000-8000-000000000000\",\"sender_id\":\"$UID_\",\"body\":\"void\",\"client_id\":\"qa-void-$RANDOM\"}" "$TOKEN")"
+check "B sees the conversation" "1" "$(code GET "$SUPABASE_URL/rest/v1/conversations?select=id" "" "$TOKEN2" >/dev/null; jlen)"
+check "B sees A's message" "200" "$(code GET "$SUPABASE_URL/rest/v1/messages?select=id,body&conversation_id=eq.$CONV1" "" "$TOKEN2")"
+check "B replies" "201" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID2_\",\"body\":\"hi back\",\"client_id\":\"qa-reply-$RANDOM\"}" "$TOKEN2")"
+check "A cannot edit B's message" "0" "$(code PATCH "$SUPABASE_URL/rest/v1/messages?conversation_id=eq.$CONV1&sender_id=eq.$UID2_" '{"body":"tampered"}' "$TOKEN" >/dev/null; jlen)"
+check "message read receipt is writable for the member" "200" "$(code PATCH "$SUPABASE_URL/rest/v1/conversation_members?conversation_id=eq.$CONV1&user_id=eq.$UID_" '{"last_read_at":"2026-11-14T12:00:00Z"}' "$TOKEN")"
+check "membership row cannot be forged (joined_at)" "403" "$(code PATCH "$SUPABASE_URL/rest/v1/conversation_members?conversation_id=eq.$CONV1&user_id=eq.$UID_" '{"joined_at":"2026-01-01T00:00:00Z"}' "$TOKEN")"
+
+echo "== 9. anon (no session) is fenced off =="
 check "anon GET profiles denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/profiles?select=id")"
 check "anon GET account_status denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/account_status?select=status")"
+check "anon GET messages denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/messages?select=id")"
+# 403 (permission denied on the function) rather than 401: either way anon is out.
+check "anon cannot call start_direct_conversation" "403" "$(code POST "$SUPABASE_URL/rest/v1/rpc/start_direct_conversation" '{"p_other":"00000000-0000-4000-8000-000000000000"}')"
 
 echo
 printf '===== LIVE API: %d passed, %d failed =====\n' "$PASS" "$FAIL"
