@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,6 +11,8 @@ import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../device/application/device_registration_controller.dart';
+import '../../notifications/application/push_controller.dart';
+import '../../notifications/presentation/push_status_card.dart';
 import '../application/profile_controller.dart';
 import '../domain/profile.dart';
 
@@ -181,7 +182,9 @@ class _ProfileBody extends ConsumerWidget {
           ),
           const SizedBox(height: 14),
         ],
-        if (kDebugMode) ...[
+        const PushStatusCard(),
+        const SizedBox(height: 14),
+        if (deviceState.hasError) ...[
           _Row(
             icon: Icons.palette_outlined,
             label: 'Design system',
@@ -204,6 +207,8 @@ class _ProfileBody extends ConsumerWidget {
         GradientButton(
           label: 'Log out',
           onPressed: () async {
+            // Deactivate push for this device while the session still exists.
+            await ref.read(pushRegistrationProvider.notifier).handleSignOut();
             await ref.read(authControllerProvider.notifier).signOut();
             if (context.mounted) context.go('/welcome');
           },

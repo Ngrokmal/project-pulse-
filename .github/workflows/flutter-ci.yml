@@ -32,6 +32,26 @@ jobs:
       - name: Apply migrations to a fresh database and run the RLS suite
         run: bash supabase/tests/run_local.sh
 
+  edge-functions:
+    name: Edge Functions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check every Edge Function
+        run: |
+          for f in supabase/functions/*/index.ts; do
+            echo "→ $f"
+            deno check "$f"
+          done
+
+      - name: Unit tests (payload building, error mapping, RS256 signing)
+        run: deno test --allow-env supabase/functions/
+
   analyze-and-test:
     name: Analyze & test
     runs-on: ubuntu-latest

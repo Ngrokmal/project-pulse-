@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app/app.dart';
 import 'core/config/app_config.dart';
+import 'core/platform/firebase_bootstrap.dart';
 import 'core/logging/app_logger.dart';
 
 final _log = AppLogger('bootstrap');
@@ -22,6 +23,10 @@ Future<void> main() async {
         _log.error('flutter_error', error: details.exceptionAsString());
         if (kDebugMode) FlutterError.presentError(details);
       };
+
+      // Push must come up before the first frame so a cold-start notification
+      // tap is not lost. Failure is non-fatal by design.
+      await initialiseFirebase();
 
       if (AppConfig.isBackendConfigured) {
         try {

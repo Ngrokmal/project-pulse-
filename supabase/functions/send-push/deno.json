@@ -1,0 +1,8 @@
+{
+  "tasks": {
+    "test": "deno test --allow-env --allow-net=oauth2.googleapis.com,fcm.googleapis.com ."
+  },
+  "imports": {
+    "jsr:@supabase/supabase-js@2": "jsr:@supabase/supabase-js@2"
+  }
+}

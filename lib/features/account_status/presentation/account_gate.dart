@@ -10,6 +10,7 @@ import '../../../core/widgets/gradient_button.dart';
 import '../../../core/widgets/pulse_mark.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../notifications/application/push_controller.dart';
 import '../application/account_status_controller.dart';
 import '../domain/account_status.dart';
 
@@ -111,6 +112,9 @@ class _RestrictedAccountScreen extends ConsumerWidget {
               GradientButton(
                 label: 'Log out',
                 onPressed: () async {
+                  await ref
+                      .read(pushRegistrationProvider.notifier)
+                      .handleSignOut();
                   await ref.read(authControllerProvider.notifier).signOut();
                   if (context.mounted) context.go('/welcome');
                 },

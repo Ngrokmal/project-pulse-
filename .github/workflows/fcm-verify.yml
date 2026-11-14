@@ -1,0 +1,31 @@
+name: FCM verification
+
+# Proves the push path against the real Firebase project without delivering
+# anything to a user: OAuth2 assertion → validate_only payload check → dead-token
+# classification. Manual only.
+on:
+  workflow_dispatch:
+
+jobs:
+  fcm:
+    name: Live FCM probe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Unit tests
+        run: deno test --allow-env supabase/functions/
+
+      - name: Live probe against pulse-2f3a4
+        env:
+          FCM_SERVICE_ACCOUNT: ${{ secrets.FCM_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FCM_SERVICE_ACCOUNT" ]; then
+            echo "::error::Set the FCM_SERVICE_ACCOUNT repository secret (rotated key) first."
+            exit 1
+          fi
+          deno run -A supabase/functions/send-push/live_check.ts

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand primary (design/tokens.json: primary #7B5FED). Used as the FCM
+         notification accent colour on Android. -->
+    <color name="pulse_primary">#FF7B5FED</color>
+</resources>

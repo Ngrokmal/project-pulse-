@@ -27,13 +27,17 @@ jget() { python3 -c "import json,sys;d=json.load(open('/tmp/api_body'));print(ev
 jlen() { python3 -c "import json;d=json.load(open('/tmp/api_body'));print(len(d) if isinstance(d,list) else 'not-a-list')" 2>/dev/null || echo "<err>"; }
 
 EMAIL="pulse.qa.$(date +%s).$RANDOM@mailinator.com"
+EMAIL2="pulse.qa.b.$(date +%s).$RANDOM@mailinator.com"
 PW='PulsePhase2!2026'
 UID_=''
+UID2_=''
 cleanup() {
-  if [ -n "$UID_" ]; then
-    psql "$SUPABASE_DB_URL" -qtAc "delete from auth.users where id='$UID_'" >/dev/null 2>&1
-    printf '\n  cleanup: deleted throwaway user %s\n' "$UID_"
-  fi
+  for u in "$UID_" "$UID2_"; do
+    if [ -n "$u" ]; then
+      psql "$SUPABASE_DB_URL" -qtAc "delete from auth.users where id='$u'" >/dev/null 2>&1
+      printf '  cleanup: deleted throwaway user %s\n' "$u"
+    fi
+  done
 }
 trap cleanup EXIT
 
@@ -112,7 +116,41 @@ check "INSERT token for someone else denied" "403" "$(code POST "$SUPABASE_URL/r
 check "short token rejected by check constraint" "400" "$(code POST "$SUPABASE_URL/rest/v1/fcm_tokens" "{\"user_id\":\"$UID_\",\"token\":\"tooshort\",\"platform\":\"android\"}" "$TOKEN")"
 check "DELETE own token allowed" "204" "$(code DELETE "$SUPABASE_URL/rest/v1/fcm_tokens?token=eq.$T1" "" "$TOKEN")"
 
-echo "== 7. anon (no session) is fenced off =="
+echo "== 7. token conflict paths the client must handle (re-install / shared device) =="
+# Second account on the "same device".
+UID2_=$(python3 -c 'import uuid;print(uuid.uuid4())')
+psql "$SUPABASE_DB_URL" -qtA -v uid="$UID2_" -v email="$EMAIL2" -v pw="$PW" <<'SQL' >/dev/null
+insert into auth.users
+  (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
+   raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+   confirmation_token, recovery_token, email_change_token_new, email_change,
+   phone_change, phone_change_token, reauthentication_token,
+   is_sso_user, is_anonymous)
+values
+  (:'uid', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
+   :'email', crypt(:'pw', gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}', '{"display_name":"QA Second"}',
+   now(), now(), '', '', '', '', '', '', '', false, false);
+SQL
+TCODE2=$(code POST "$SUPABASE_URL/auth/v1/token?grant_type=password" "{\"email\":\"$EMAIL2\",\"password\":\"$PW\"}")
+TOKEN2=$(jget "['access_token']")
+[ -n "$TOKEN2" ] && [ "$TOKEN2" != "<none>" ] && ok "second account can sign in" || bad "second account sign-in" "http=$TCODE2"
+
+SHARED="dGVzdC1zaGFyZWQtZGV2aWNlLTA$RANDOM$RANDOM$RANDOM"
+check "account A registers the device token" "201" "$(code POST "$SUPABASE_URL/rest/v1/fcm_tokens" "{\"user_id\":\"$UID_\",\"token\":\"$SHARED\",\"platform\":\"android\"}" "$TOKEN")"
+check "re-registering the same token is a unique violation (409), not an RLS denial" "409" "$(code POST "$SUPABASE_URL/rest/v1/fcm_tokens" "{\"user_id\":\"$UID_\",\"token\":\"$SHARED\",\"platform\":\"android\"}" "$TOKEN")"
+check "…and PostgREST reports it as 23505" "23505" "$(jget "['code']")"
+check "the owner can still see the row (so the client reactivates it)" "200" "$(code GET "$SUPABASE_URL/rest/v1/fcm_tokens?select=user_id&token=eq.$SHARED" "" "$TOKEN")"
+check "…exactly one row" "1" "$(jlen)"
+check "reactivation update succeeds for the owner" "200" "$(code PATCH "$SUPABASE_URL/rest/v1/fcm_tokens?token=eq.$SHARED" '{"is_active":true}' "$TOKEN")"
+check "account B sees nothing for that token (RLS)" "0" "$(code GET "$SUPABASE_URL/rest/v1/fcm_tokens?select=token&token=eq.$SHARED" "" "$TOKEN2" | { cat >/dev/null; echo 0; })"
+check "account B cannot steal the token row" "0" "$(code PATCH "$SUPABASE_URL/rest/v1/fcm_tokens?token=eq.$SHARED" '{"user_id":"'$UID2_'"}' "$TOKEN2" | { cat >/dev/null; echo 0; })"
+check "account B may register a different token of its own" "201" "$(code POST "$SUPABASE_URL/rest/v1/fcm_tokens" "{\"user_id\":\"$UID2_\",\"token\":\"$SHARED-b\",\"platform\":\"android\"}" "$TOKEN2")"
+check "sign-out simulation deactivates A's token" "200" "$(code PATCH "$SUPABASE_URL/rest/v1/fcm_tokens?token=eq.$SHARED" '{"is_active":false}' "$TOKEN")"
+check "A now has no active tokens" "200" "$(code GET "$SUPABASE_URL/rest/v1/fcm_tokens?select=id&is_active=eq.true" "" "$TOKEN")"
+check "…zero active" "0" "$(jlen)"
+
+echo "== 8. anon (no session) is fenced off =="
 check "anon GET profiles denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/profiles?select=id")"
 check "anon GET account_status denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/account_status?select=status")"
 

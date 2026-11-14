@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- The app talks to Supabase, Cloudinary and FCM in release builds too.
+         Flutter only adds INTERNET to the debug/profile manifests. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 13+ requires an explicit runtime grant before notifications can
+         be shown at all. Requested in-app with a real rationale (§31). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
+
     <application
         android:label="Pulse"
         android:name="${applicationName}"
@@ -25,6 +33,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- FCM delivers to this channel; MainActivity creates it before the
+             first push can arrive so notifications are never silently dropped. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="pulse_default" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/pulse_primary" />
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
