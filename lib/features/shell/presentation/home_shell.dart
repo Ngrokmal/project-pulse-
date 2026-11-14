@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../account_status/presentation/account_gate.dart';
 import '../../calls/presentation/calls_screen.dart';
+import '../../notifications/presentation/push_banner.dart';
 import '../../inbox/presentation/inbox_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 
@@ -30,9 +31,16 @@ class _HomeShellState extends ConsumerState<HomeShell> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: AccountGate(
-        child: IndexedStack(
-          index: _index,
-          children: const [InboxScreen(), CallsScreen(), ProfileScreen()],
+        child: Column(
+          children: [
+            PushBanner(onOpenInbox: () => setState(() => _index = 0)),
+            Expanded(
+              child: IndexedStack(
+                index: _index,
+                children: const [InboxScreen(), CallsScreen(), ProfileScreen()],
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: NavigationBar(

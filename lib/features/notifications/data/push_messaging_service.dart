@@ -93,6 +93,19 @@ class PushMessagingService {
   /// the foreground, so the UI decides what to present (§31).
   Stream<RemoteMessage> get foregroundMessages => FirebaseMessaging.onMessage;
 
+  /// Taps on a notification while the app is running or in the background.
+  Stream<RemoteMessage> get openedMessages =>
+      FirebaseMessaging.onMessageOpenedApp;
+
+  /// The push that launched the app from a terminated state, if any.
+  Future<RemoteMessage?> initialMessage() async {
+    try {
+      return await FirebaseMessaging.instance.getInitialMessage();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> allowForegroundPresentation() async {
     try {
       await _messaging.setForegroundNotificationPresentationOptions(
