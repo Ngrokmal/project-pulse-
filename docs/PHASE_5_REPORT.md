@@ -129,3 +129,101 @@ app now offers a **"Log in instead"** button that takes you to the login form.
    in the foreground.
 4. Nothing in this phase was tested on a physical device — I have no `/dev/kvm`
    and no phone. Foreground/Doze/FCM behaviour remains yours to verify.
+
+---
+
+# Phase 5b — Force Audio, end to end (pushed, deployed)
+
+**Commit:** `70f265f` · **Migration:** `0005_force_audio.sql` (applied to the live
+project, version recorded) · **Edge Functions deployed:** `send-push`,
+`device-register`, `force-audio-create` (all `ACTIVE`, `verify_jwt = true`)
+
+The Supabase personal access token arrived during this phase, which unblocked the
+server half — the parts that were previously impossible.
+
+## 1. What is now real
+
+| Piece | State |
+|---|---|
+| Recorder (real microphone, amplitude meter, hard stop at 1:10) | built |
+| Sender: record → upload with real % → message + alert | built |
+| Alert storage with server-enforced limits and lifecycle | built + applied |
+| `force-audio-create` Edge Function (validates, inserts under RLS, pushes) | built + **deployed** |
+| `send-push` (FCM HTTP v1) | **deployed**, real Google round-trip proven |
+| Receiver: verify → download with real % → play once → mark played | built |
+| Duplicate-playback guard (Hive) | built + tested |
+| Auto-open the Force Audio screen from a push | **not yet** (next) |
+
+The client cannot call `send-push` — it is server-only. `force-audio-create`
+inserts the alert **as the caller** (so RLS still decides membership, bans and
+limits) and then pushes the recipient with the service key.
+
+## 2. Measured results
+
+| Check | Result |
+|---|---|
+| `dart analyze lib test` | **No issues found** |
+| `flutter test` | **88 passed, 3 skipped** (the 3 skips are live-network suites) |
+| `deno test supabase/functions/` | **19 / 19** (9 send-push + 10 force-audio validation) |
+| `run_local.sh` (fresh DB, all migrations) | 10_rls **PASS**, chat **19/19**, force audio **26/26** |
+| `30_live_api_test.sh` | **93 / 93** |
+| Real audio upload | `…/video/upload/v1794670207/…wav`, 96 044 bytes, Cloudinary reports **duration 3000 ms** |
+| Real download with progress | 96 044 bytes, **57 progress events**, monotonic, last = 1.0 |
+| Cached second play | progress = `[1.0]`, no re-fetch |
+| `force-audio-create` live call | HTTP 200, `ok: true`, alert row created, **`push.status 200`** |
+| Real FCM round-trip | a deliberately dead token went **`is_active: true` → `false`** because Google answered 410 |
+
+That last row is the important one: it proves the push path is not a stub. The
+function's token lookup found the registered device, called FCM with the real
+service account, Google said "unregistered", and the token was retired — exactly
+the behaviour §31 requires.
+
+## 3. Server-side rules now enforced by the database, not by the app
+
+- `duration_ms between 500 and 70000` — 71 s is refused even from a modified client.
+- `size_bytes between 1 and 10485760` — 10 MiB + 1 byte is refused.
+- `media_url like 'https://res.cloudinary.com/%'` — the receiver can never be
+  pointed at a third-party host.
+- `sender_id <> recipient_id`, and the recipient must be the other member of that
+  conversation and not banned.
+- `state`/`played_at`/`expires_at` are **not granted** to `authenticated`: a client
+  cannot pre-mark an alert played or extend its own expiry.
+- A trigger makes evidence immutable and `played`/`expired` terminal, so a replayed
+  push cannot resurrect a played alert.
+- `expire_force_audio_alerts()` (service_role only) sweeps stale alerts; it uses a
+  transaction-local flag rather than a role name for its maintenance bypass.
+
+## 4. Two bugs found and fixed while doing this
+
+1. **Cloudinary `duration` is in seconds, not milliseconds.** The old parser
+   returned `13` for a 12.6 s video. Now it returns `12600`, and the live upload of
+   3 s of audio reports `3000 ms`.
+2. **`send-push` rejected every server-side caller.** Its guard required a JWT with
+   `role: service_role`, but newer projects issue `sb_secret_…` keys that are not
+   JWTs, so `force-audio-create` got a 403 and every push failed. It now also
+   accepts the project's service key with a constant-time comparison.
+
+## 5. What a tester can do with the new build
+
+1. Log in as Arif, open the chat with Bela.
+2. Tap the **microphone** in the composer → grant the microphone → tap to record.
+3. Watch the bars move with your voice, the timer count up, and the meter stop
+   hard at 1:10. Stop, preview, send.
+4. The bubble shows "Uploading — 42%" with real bytes, then "Force Audio sent".
+5. On Bela's phone (logged in as Bela, same chat) tapping the bubble shows
+   "Checking for new messages…" → "Downloading 63%" → plays.
+6. Tapping again says "Played" and does **not** replay.
+
+## 6. Still open (honest)
+
+1. **Push → auto-open**: `force-audio-create` now sends a real notification with
+   `force_audio_alert_id`, and the app already parses it, but tapping the
+   notification still lands on the chat rather than jumping straight into a
+   full-screen Force Audio playback with "Checking for new messages". That is the
+   last piece of §5 and it needs the notification-tap handler wired to the alert id.
+2. **No physical-device testing** — I have no phone and no `/dev/kvm`. The
+   recorder, the runtime permission prompt, Doze, background playback and the
+   notification tap are all yours to verify.
+3. **`send-push`'s new service-key acceptance** should get a unit test in
+   `lib_test.ts` for the non-JWT case (the constant-time compare is covered only
+   by the live call above).
