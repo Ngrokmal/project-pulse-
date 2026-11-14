@@ -99,7 +99,7 @@ else
 fi
 
 echo "== 4. authenticated reads through PostgREST =="
-check "GET own profile (RLS select)" "200" "$(code GET "$SUPABASE_URL/rest/v1/profiles?select=id,display_name,username&limit=1" "" "$TOKEN")"
+check "GET own profile (RLS select)" "200" "$(code GET "$SUPABASE_URL/rest/v1/profiles?select=id,display_name,username&id=eq.$UID_" "" "$TOKEN")"
 check "profile shape" "$UID_|QA Phase Two|None" "$(jget "[0]['id']")|$(jget "[0]['display_name']")|$(jget "[0]['username']")"
 check "GET own account_status" "200" "$(code GET "$SUPABASE_URL/rest/v1/account_status?select=status" "" "$TOKEN")"
 check "status value" "active" "$(jget "[0]['status']")"
@@ -176,6 +176,17 @@ check "B replies" "201" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conver
 check "A cannot edit B's message" "0" "$(code PATCH "$SUPABASE_URL/rest/v1/messages?conversation_id=eq.$CONV1&sender_id=eq.$UID2_" '{"body":"tampered"}' "$TOKEN" >/dev/null; jlen)"
 check "message read receipt is writable for the member" "200" "$(code PATCH "$SUPABASE_URL/rest/v1/conversation_members?conversation_id=eq.$CONV1&user_id=eq.$UID_" '{"last_read_at":"2026-11-14T12:00:00Z"}' "$TOKEN")"
 check "membership row cannot be forged (joined_at)" "403" "$(code PATCH "$SUPABASE_URL/rest/v1/conversation_members?conversation_id=eq.$CONV1&user_id=eq.$UID_" '{"joined_at":"2026-01-01T00:00:00Z"}' "$TOKEN")"
+
+echo "== 8b. media messages (Cloudinary URL + size, no bytes in Postgres) =="
+MEDIA_URL="https://res.cloudinary.com/kojvlesm/image/upload/v1794667578/pulse/messages/qa.jpg"
+check "A sends an image message (empty body + media_url)" "201" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"image\",\"body\":\"\",\"media_url\":\"$MEDIA_URL\",\"media_bytes\":148568,\"client_id\":\"qa-img-$RANDOM$RANDOM\"}" "$TOKEN")"
+ok "non-text message with an empty body is accepted"
+check "media message is readable by the other member" "$MEDIA_URL" "$(code GET "$SUPABASE_URL/rest/v1/messages?select=media_url&kind=eq.image&conversation_id=eq.$CONV1" "" "$TOKEN2" >/dev/null; jget "[0]['media_url']")"
+check "media_bytes round-tripped" "148568" "$(code GET "$SUPABASE_URL/rest/v1/messages?select=media_bytes&kind=eq.image&conversation_id=eq.$CONV1" "" "$TOKEN" >/dev/null; jget "[0]['media_bytes']")"
+check "non-text message without media_url is rejected" "400" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"video\",\"body\":\"\",\"client_id\":\"qa-nourl-$RANDOM$RANDOM\"}" "$TOKEN")"
+check "media_bytes = 0 is rejected by the check constraint" "400" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"file\",\"body\":\"\",\"media_url\":\"$MEDIA_URL\",\"media_bytes\":0,\"client_id\":\"qa-zero-$RANDOM$RANDOM\"}" "$TOKEN")"
+check "an unknown kind is rejected" "400" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"malware\",\"body\":\"x\",\"client_id\":\"qa-kind-$RANDOM$RANDOM\"}" "$TOKEN")"
+check "a text message still requires a non-empty body" "400" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"text\",\"body\":\"\",\"client_id\":\"qa-empty-$RANDOM$RANDOM\"}" "$TOKEN")"
 
 echo "== 9. anon (no session) is fenced off =="
 check "anon GET profiles denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/profiles?select=id")"

@@ -33,6 +33,7 @@ class Message {
     this.body,
     this.mediaUrl,
     this.mediaThumbUrl,
+    this.mediaBytes,
     this.durationMs,
     this.clientId,
     this.isDeleted = false,
@@ -47,6 +48,7 @@ class Message {
   final String? body;
   final String? mediaUrl;
   final String? mediaThumbUrl;
+  final int? mediaBytes;
   final int? durationMs;
   final String? clientId;
   final bool isDeleted;
@@ -63,6 +65,7 @@ class Message {
     body: map['body'] as String?,
     mediaUrl: map['media_url'] as String?,
     mediaThumbUrl: map['media_thumb_url'] as String?,
+    mediaBytes: (map['media_bytes'] as num?)?.toInt(),
     durationMs: (map['duration_ms'] as num?)?.toInt(),
     clientId: map['client_id'] as String?,
     isDeleted: map['deleted_at'] != null,
@@ -78,6 +81,7 @@ class Message {
     'body': body,
     'media_url': mediaUrl,
     'media_thumb_url': mediaThumbUrl,
+    'media_bytes': mediaBytes,
     'duration_ms': durationMs,
     'client_id': clientId,
     'deleted_at': isDeleted ? createdAt.toUtc().toIso8601String() : null,
@@ -93,6 +97,7 @@ class Message {
         body: body,
         mediaUrl: mediaUrl,
         mediaThumbUrl: mediaThumbUrl,
+        mediaBytes: mediaBytes,
         durationMs: durationMs,
         clientId: clientId,
         isDeleted: isDeleted ?? this.isDeleted,

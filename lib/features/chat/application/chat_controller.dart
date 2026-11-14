@@ -12,6 +12,8 @@ import '../data/chat_local_store.dart';
 import '../data/supabase_chat_repository.dart';
 import '../domain/chat_repository.dart';
 import '../domain/conversation.dart';
+import '../../media/application/media_controller.dart';
+import '../../media/domain/media_asset.dart';
 import '../domain/message.dart';
 
 final _log = AppLogger('chat');
@@ -202,6 +204,61 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
     );
 
     await _deliver(optimistic, clientId, body);
+  }
+
+  /// Uploads [media] with live progress, then sends a message referencing it.
+  /// The upload itself is not queued offline — a half-uploaded file would be a
+  /// lie — but a failure surfaces immediately and the user can retry.
+  Future<void> sendMedia({
+    required PickedMedia media,
+    required MessageKind kind,
+  }) async {
+    final current = state.value ?? const ChatThreadState(messages: []);
+    final upload = ref.read(mediaUploadProvider.notifier);
+    final asset = await upload.upload(media);
+    final clientId = _uuid.v4();
+    final auth = ref.read(authControllerProvider);
+    final myId = auth is AuthSignedIn ? auth.user.id : '';
+
+    final optimistic = Message(
+      id: 'pending:$clientId',
+      conversationId: conversationId,
+      senderId: myId,
+      kind: kind,
+      createdAt: DateTime.now(),
+      mediaUrl: asset.secureUrl,
+      mediaBytes: asset.bytes,
+      clientId: clientId,
+      delivery: DeliveryState.pending,
+    );
+    state = AsyncData(
+      current.copyWith(messages: [...current.messages, optimistic]),
+    );
+
+    try {
+      final saved = await ref
+          .read(chatRepositoryProvider)
+          .sendMessage(
+            conversationId: conversationId,
+            clientId: clientId,
+            body: '',
+            kind: kind,
+            mediaUrl: asset.secureUrl,
+            mediaBytes: asset.bytes,
+          );
+      _replace(optimistic.id, saved);
+      ref.read(conversationsProvider.notifier).refresh();
+    } on AppFailure {
+      // The bytes are already on Cloudinary, but the row never landed. Mark the
+      // bubble failed so it is visibly unfinished instead of pretending to send.
+      _replace(
+        optimistic.id,
+        optimistic.copyWith(delivery: DeliveryState.failed),
+      );
+      rethrow;
+    } finally {
+      upload.clear();
+    }
   }
 
   Future<void> _deliver(

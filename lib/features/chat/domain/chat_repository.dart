@@ -21,6 +21,8 @@ abstract interface class ChatRepository {
     required String clientId,
     required String body,
     MessageKind kind = MessageKind.text,
+    String? mediaUrl,
+    int? mediaBytes,
   });
 
   /// Soft-deletes one of my own messages.

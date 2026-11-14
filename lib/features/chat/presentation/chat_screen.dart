@@ -10,6 +10,10 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/chat_controller.dart';
+import '../../media/presentation/media_bubble.dart';
+import '../../media/application/media_controller.dart';
+import '../../media/data/file_picker_source.dart';
+import '../../media/domain/media_asset.dart';
 import '../domain/message.dart';
 
 /// A single conversation. Real Realtime inserts, optimistic sends, offline retry.
@@ -43,6 +47,42 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       await ref
           .read(chatThreadProvider(widget.conversationId).notifier)
           .send(text);
+      _scrollToEnd();
+    } on AppFailure catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(e.userMessage)));
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  /// Picks a file, validates it against the size limit for its type, uploads it
+  /// with live progress and then sends the message that references it.
+  Future<void> _attach() async {
+    if (_sending) return;
+    try {
+      final media = await const FilePickerSource().pick();
+      if (media == null) return; // cancelled
+      final sizeError = PickedMedia.validateSize(
+        media.resourceType,
+        media.sizeBytes,
+      );
+      if (sizeError != null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(sizeError)));
+        return;
+      }
+      final kind = switch (media.resourceType) {
+        MediaResourceType.image => MessageKind.image,
+        MediaResourceType.video => MessageKind.video,
+        MediaResourceType.raw => MessageKind.file,
+      };
+      setState(() => _sending = true);
+      await ref
+          .read(chatThreadProvider(widget.conversationId).notifier)
+          .sendMedia(media: media, kind: kind);
       _scrollToEnd();
     } on AppFailure catch (e) {
       if (!mounted) return;
@@ -170,8 +210,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 },
               ),
             ),
+            const _UploadProgressBar(),
             _Composer(
               controller: _controller,
+              onAttach: _sending ? null : _attach,
               sending: _sending,
               onSend: _send,
               onTyping: () => ref
@@ -280,15 +322,20 @@ class _Bubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            message.isDeleted ? 'Message deleted' : (message.body ?? ''),
-            style: AppTypography.bodyMedium.copyWith(
-              color: mine && !failed
-                  ? AppColors.onPrimary
-                  : AppColors.textPrimary,
-              fontStyle: message.isDeleted ? FontStyle.italic : null,
+          if (!message.isDeleted &&
+              message.kind != MessageKind.text &&
+              message.mediaUrl != null)
+            MediaBubble(message: message, mine: mine)
+          else
+            Text(
+              message.isDeleted ? 'Message deleted' : (message.body ?? ''),
+              style: AppTypography.bodyMedium.copyWith(
+                color: mine && !failed
+                    ? AppColors.onPrimary
+                    : AppColors.textPrimary,
+                fontStyle: message.isDeleted ? FontStyle.italic : null,
+              ),
             ),
-          ),
           const SizedBox(height: 4),
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -364,16 +411,65 @@ class _Bubble extends StatelessWidget {
   }
 }
 
+class _UploadProgressBar extends ConsumerWidget {
+  const _UploadProgressBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final upload = ref.watch(mediaUploadProvider);
+    if (upload == null) return const SizedBox.shrink();
+    final pct = (upload.progress * 100).clamp(0, 100).toStringAsFixed(0);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.cloud_upload_outlined,
+                size: 14,
+                color: AppColors.brand600,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Uploading ${upload.fileName} — $pct%',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.caption,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(AppRadius.pill),
+            child: LinearProgressIndicator(
+              value: upload.progress,
+              minHeight: 4,
+              backgroundColor: AppColors.brand100,
+              valueColor: const AlwaysStoppedAnimation(AppColors.brand600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _Composer extends StatelessWidget {
   const _Composer({
     required this.controller,
     required this.sending,
     required this.onSend,
     required this.onTyping,
+    this.onAttach,
   });
 
   final TextEditingController controller;
   final bool sending;
+  final VoidCallback? onAttach;
   final VoidCallback onSend;
   final VoidCallback onTyping;
 
@@ -393,6 +489,12 @@ class _Composer extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          IconButton(
+            tooltip: 'Attach a photo, video or file',
+            onPressed: onAttach,
+            icon: const Icon(Icons.attach_file_rounded),
+            color: AppColors.brand600,
+          ),
           Expanded(
             child: TextField(
               controller: controller,

@@ -123,9 +123,22 @@ class SupabaseAuthRepository implements AuthRepository {
       );
     }
     if (code.contains('rate_limit') || msg.contains('rate limit')) {
-      return const AuthFailure(
-        'Too many attempts. Please wait a moment and try again.',
-        kind: AuthFailureKind.rateLimited,
+      // Two very different situations share the 429 code:
+      //  • over_email_send_rate_limit — the project's mailer is capped. Signing up
+      //    is impossible until the cap resets or custom SMTP is configured, and no
+      //    amount of "waiting a moment" helps. Say that, and point at sign-in.
+      //  • anything else — a genuine throttling of attempts.
+      final emailLimit =
+          code.contains('email_send') || msg.contains('email rate limit');
+      return AuthFailure(
+        emailLimit
+            ? 'Sign-up emails are rate limited on this project right now. '
+                  'If you already have an account, log in instead — otherwise '
+                  'try again later.'
+            : 'Too many attempts. Please wait a moment and try again.',
+        kind: emailLimit
+            ? AuthFailureKind.emailRateLimited
+            : AuthFailureKind.rateLimited,
       );
     }
     if (msg.contains('socket') ||

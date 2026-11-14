@@ -13,6 +13,11 @@ sealed class AppFailure implements Exception {
 
   String get code;
 
+  /// Convenience for screens that switch to the login form when signup is
+  /// blocked by the project's mail limit.
+  bool get isAuthEmailRateLimited =>
+      this is AuthFailure && (this as AuthFailure).suggestLogin;
+
   @override
   String toString() => 'AppFailure($code): $userMessage';
 }
@@ -61,6 +66,10 @@ class AuthFailure extends AppFailure {
   @override
   bool get isRetryable =>
       kind == AuthFailureKind.rateLimited || kind == AuthFailureKind.unknown;
+
+  /// True when signing up is blocked by the project's mail limit and the user
+  /// should log in with an existing account instead.
+  bool get suggestLogin => kind == AuthFailureKind.emailRateLimited;
 }
 
 enum AuthFailureKind {
@@ -69,6 +78,7 @@ enum AuthFailureKind {
   emailInUse,
   weakPassword,
   rateLimited,
+  emailRateLimited,
   notConfigured,
   unknown,
 }

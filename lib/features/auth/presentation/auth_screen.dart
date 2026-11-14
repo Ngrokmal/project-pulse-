@@ -175,7 +175,18 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                       const SizedBox(height: 14),
                     ],
                     if (_failure != null) ...[
-                      PulseInlineNotice(message: _failure!.userMessage),
+                      PulseInlineNotice(
+                        message: _failure!.userMessage,
+                        actionLabel: _failure!.isAuthEmailRateLimited
+                            ? 'Log in instead'
+                            : null,
+                        onAction: _failure!.isAuthEmailRateLimited
+                            ? () => setState(() {
+                                _mode = _Mode.login;
+                                _failure = null;
+                              })
+                            : null,
+                      ),
                       const SizedBox(height: 14),
                     ],
                     Form(

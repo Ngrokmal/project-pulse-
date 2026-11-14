@@ -99,9 +99,17 @@ class SupabaseChatRepository implements ChatRepository {
     required String clientId,
     required String body,
     MessageKind kind = MessageKind.text,
+    String? mediaUrl,
+    int? mediaBytes,
   }) async {
-    final reason = Message.validateBody(body);
-    if (reason != null) throw ValidationFailure('body', reason);
+    // Media messages carry a URL instead of body text; text messages must not
+    // be blank.
+    if (kind == MessageKind.text) {
+      final reason = Message.validateBody(body);
+      if (reason != null) throw ValidationFailure('body', reason);
+    } else if (mediaUrl == null || mediaUrl.isEmpty) {
+      throw const ValidationFailure('media', 'Upload finished without a URL.');
+    }
     try {
       final row = await _client
           .from('messages')
@@ -109,7 +117,9 @@ class SupabaseChatRepository implements ChatRepository {
             'conversation_id': conversationId,
             'sender_id': _me,
             'kind': messageKindToDb(kind),
-            'body': body.trim(),
+            'body': kind == MessageKind.text ? body.trim() : null,
+            'media_url': mediaUrl,
+            'media_bytes': mediaBytes,
             'client_id': clientId,
           })
           .select()
