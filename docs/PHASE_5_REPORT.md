@@ -134,9 +134,11 @@ app now offers a **"Log in instead"** button that takes you to the login form.
 
 # Phase 5b — Force Audio, end to end (pushed, deployed)
 
-**Commit:** `70f265f` · **Migration:** `0005_force_audio.sql` (applied to the live
-project, version recorded) · **Edge Functions deployed:** `send-push`,
-`device-register`, `force-audio-create` (all `ACTIVE`, `verify_jwt = true`)
+**Commits:** `70f265f` + `879d950` · **CI run:** `43611852237` — all four jobs
+green · **Artifact:** `pulse-release-apk`, 32.4 MB, id `14120557621`
+**Migration:** `0005_force_audio.sql` (applied to the live project, version
+recorded) · **Edge Functions deployed:** `send-push`, `device-register`,
+`force-audio-create` (all `ACTIVE`, `verify_jwt = true`)
 
 The Supabase personal access token arrived during this phase, which unblocked the
 server half — the parts that were previously impossible.
@@ -165,6 +167,7 @@ limits) and then pushes the recipient with the service key.
 | `dart analyze lib test` | **No issues found** |
 | `flutter test` | **88 passed, 3 skipped** (the 3 skips are live-network suites) |
 | `deno test supabase/functions/` | **19 / 19** (9 send-push + 10 force-audio validation) |
+| Release APK permission gate (CI) | `network + notification + microphone permissions present` |
 | `run_local.sh` (fresh DB, all migrations) | 10_rls **PASS**, chat **19/19**, force audio **26/26** |
 | `30_live_api_test.sh` | **93 / 93** |
 | Real audio upload | `…/video/upload/v1794670207/…wav`, 96 044 bytes, Cloudinary reports **duration 3000 ms** |
@@ -227,3 +230,8 @@ the behaviour §31 requires.
 3. **`send-push`'s new service-key acceptance** should get a unit test in
    `lib_test.ts` for the non-JWT case (the constant-time compare is covered only
    by the live call above).
+
+One CI failure happened on the way here and is fixed: `deno test` runs without
+`--allow-net`, and importing `force-audio-create/index.ts` executed `Deno.serve`
+at import time. The validation moved to `lib.ts` (same layout as `send-push`), so
+the tests import only the pure code.
