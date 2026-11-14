@@ -260,6 +260,10 @@ d2e5013  Phase 5c: notification tap opens the Force Audio takeover screen
 49189f4  Phase 8: calls — state machine, provider abstraction, no fake connected
 2d710ed  Phase 9: settings, notification permission states, a11y and lifecycle
 d0ebdba  Phase 10: security review, RLS pentest, measurements, release proof
+6254297  docs: phases 6-10 report
 ```
 
-CI green on `d0ebdba`: `43623535110` (4/4 jobs), APK `14125047760`.
+CI green on `d0ebdba`: run `43623535110` (4/4 jobs), APK `14125047760`.
+CI green on `6254297` (final, includes this report): run `43624320883`
+(4/4 jobs: Analyze & test, Migrations & RLS, Edge Functions, Build release APK),
+APK `pulse-release-apk` `14125852046`, 32.8 MB.
