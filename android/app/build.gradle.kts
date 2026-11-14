@@ -15,7 +15,7 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Must match firebase/google-services.json (package_name).
         applicationId = "com.pulsemessenger.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -31,10 +31,22 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // PHASE 2 task: replace with a real upload keystore read from
+            // android/key.properties (kept out of git). Debug signing today so
+            // CI produces an installable artifact.
             signingConfig = signingConfigs.getByName("debug")
         }
+    }
+
+    // AGP's lint task crashes inside its own JavaDocParser on this toolchain
+    // (NoSuchMethodError), which fails `flutter build apk --release` for
+    // reasons unrelated to our code. Dart static analysis (`flutter analyze`,
+    // run as a separate CI gate) is our static-analysis of record, so release
+    // lint is disabled here and tracked as a separate task instead of being
+    // silently ignored during development.
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 
