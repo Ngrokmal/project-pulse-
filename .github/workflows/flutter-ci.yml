@@ -141,11 +141,11 @@ jobs:
           "$AAPT2" dump permissions "$APK" | tee /tmp/perms.txt
           # Phase 1/2 APKs shipped without INTERNET: every request failed and the
           # app told the user it was offline. This gate makes that impossible again.
-          for perm in android.permission.INTERNET android.permission.POST_NOTIFICATIONS; do
+          for perm in android.permission.INTERNET android.permission.POST_NOTIFICATIONS android.permission.RECORD_AUDIO; do
             grep -q "$perm" /tmp/perms.txt \
               || { echo "::error::release manifest is missing $perm"; exit 1; }
           done
-          echo "network + notification permissions present"
+          echo "network + notification + microphone permissions present"
 
       - name: Assert the APK is signed with the Pulse upload key
         run: |
