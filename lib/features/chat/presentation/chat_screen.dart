@@ -9,6 +9,9 @@ import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../calls/application/call_controller.dart';
+import '../../calls/domain/call_session.dart';
+import '../domain/conversation.dart';
 import '../application/chat_controller.dart';
 import 'group_info_sheet.dart';
 import '../../media/presentation/media_bubble.dart';
@@ -96,6 +99,26 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
   }
 
+  Future<void> _startCall(
+    BuildContext context,
+    WidgetRef ref,
+    Conversation conversation,
+  ) async {
+    final router = GoRouter.of(context);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final id = await ref.read(
+        startCallProvider((
+          conversationId: conversation.id,
+          kind: CallKind.audio,
+        )).future,
+      );
+      router.push('/call/$id');
+    } on AppFailure catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text(e.userMessage)));
+    }
+  }
+
   void _scrollToEnd() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scroll.hasClients) return;
@@ -164,12 +187,17 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           ],
         ),
         actions: [
+          if (conversation != null && !conversation.isGroup)
+            IconButton(
+              tooltip: 'Call',
+              icon: const Icon(Icons.call_rounded, size: 20),
+              onPressed: () => _startCall(context, ref, conversation),
+            ),
           if (conversation?.isGroup == true)
             IconButton(
               tooltip: 'Group info',
               icon: const Icon(Icons.info_outline_rounded, size: 20),
-              onPressed: () =>
-                  GroupInfoSheet.show(context, conversation!),
+              onPressed: () => GroupInfoSheet.show(context, conversation!),
             ),
         ],
       ),

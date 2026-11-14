@@ -318,6 +318,9 @@ create policy conversations_update_group_admin on public.conversations
 grant update (title, avatar_url) on public.conversations to authenticated;
 
 -- Membership rows stay unwritable by clients: the RPCs above are the only path.
+-- UPDATE is revoked at table level and re-granted for the one column chat needs
+-- (read receipts), so `role` still cannot be set by a client.
 revoke insert, update, delete on public.conversation_members from authenticated;
+grant update (last_read_at) on public.conversation_members to authenticated;
 
 commit;

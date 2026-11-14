@@ -58,37 +58,31 @@ void main() {
     });
 
     test('singular member count reads correctly', () {
-      final c = Conversation.fromMap(
-        {
-          ...groupMap(),
-          'conversation_members': [
-            {
-              'user_id': me,
-              'role': 'owner',
-              'profiles': {'id': me, 'display_name': 'Arif'},
-            },
-          ],
-        },
-        myId: me,
-      );
+      final c = Conversation.fromMap({
+        ...groupMap(),
+        'conversation_members': [
+          {
+            'user_id': me,
+            'role': 'owner',
+            'profiles': {'id': me, 'display_name': 'Arif'},
+          },
+        ],
+      }, myId: me);
       expect(c.memberCount, 1);
       expect(c.subtitleLabel, '1 member');
     });
 
     test('a group survives having no other member (peer stays empty)', () {
-      final c = Conversation.fromMap(
-        {
-          ...groupMap(),
-          'conversation_members': [
-            {
-              'user_id': me,
-              'role': 'owner',
-              'profiles': {'id': me, 'display_name': 'Arif'},
-            },
-          ],
-        },
-        myId: me,
-      );
+      final c = Conversation.fromMap({
+        ...groupMap(),
+        'conversation_members': [
+          {
+            'user_id': me,
+            'role': 'owner',
+            'profiles': {'id': me, 'display_name': 'Arif'},
+          },
+        ],
+      }, myId: me);
       expect(c.peer.id, isEmpty);
       expect(c.isGroup, isTrue);
     });
@@ -107,7 +101,11 @@ void main() {
           {
             'user_id': other,
             'role': 'member',
-            'profiles': {'id': other, 'display_name': 'Bela', 'username': 'bela'},
+            'profiles': {
+              'id': other,
+              'display_name': 'Bela',
+              'username': 'bela',
+            },
           },
         ],
       }, myId: me);

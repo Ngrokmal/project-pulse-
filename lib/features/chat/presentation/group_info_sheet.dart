@@ -132,7 +132,9 @@ class GroupInfoSheet extends ConsumerWidget {
                               decoration: BoxDecoration(
                                 color: m.role == GroupRole.member
                                     ? AppColors.bg
-                                    : AppColors.brand600.withValues(alpha: 0.12),
+                                    : AppColors.brand600.withValues(
+                                        alpha: 0.12,
+                                      ),
                                 borderRadius: BorderRadius.circular(999),
                               ),
                               child: Text(
@@ -362,9 +364,8 @@ class _AddMemberSheet extends ConsumerWidget {
                   padding: EdgeInsets.symmetric(vertical: 24),
                   child: Center(child: CircularProgressIndicator()),
                 ),
-                error: (error, _) => const PulseInlineNotice(
-                  message: 'Could not load people.',
-                ),
+                error: (error, _) =>
+                    const PulseInlineNotice(message: 'Could not load people.'),
                 data: (list) => ListView.separated(
                   shrinkWrap: true,
                   itemCount: list.length,

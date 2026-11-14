@@ -298,7 +298,9 @@ class SupabaseChatRepository implements ChatRepository {
         final byRole = rank(a.role).compareTo(rank(b.role));
         return byRole != 0
             ? byRole
-            : a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+            : a.displayName.toLowerCase().compareTo(
+                b.displayName.toLowerCase(),
+              );
       });
       return members;
     } on PostgrestException catch (e) {
@@ -332,11 +334,11 @@ class SupabaseChatRepository implements ChatRepository {
   });
 
   @override
-  Future<void> renameGroup(String conversationId, String title) =>
-      _groupRpc('rename_group', 'renameGroup', {
-        'p_conversation': conversationId,
-        'p_title': title,
-      });
+  Future<void> renameGroup(String conversationId, String title) => _groupRpc(
+    'rename_group',
+    'renameGroup',
+    {'p_conversation': conversationId, 'p_title': title},
+  );
 
   @override
   Future<void> leaveGroup(String conversationId) => _groupRpc(

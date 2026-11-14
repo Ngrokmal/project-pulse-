@@ -42,7 +42,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     try {
       final id = await ref
           .read(chatRepositoryProvider)
-          .createGroup(title: _title.text.trim(), memberIds: _selected.toList());
+          .createGroup(
+            title: _title.text.trim(),
+            memberIds: _selected.toList(),
+          );
       ref.invalidate(conversationsProvider);
       if (!mounted) return;
       router.pushReplacement('/chat/$id');
@@ -65,7 +68,8 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           tooltip: 'Back',
-          onPressed: () => context.canPop() ? context.pop() : context.go('/app'),
+          onPressed: () =>
+              context.canPop() ? context.pop() : context.go('/app'),
         ),
         title: Text('New group', style: AppTypography.titleMedium),
         actions: [
@@ -110,10 +114,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
               child: Row(
                 children: [
-                  Text(
-                    'Members',
-                    style: AppTypography.titleMedium,
-                  ),
+                  Text('Members', style: AppTypography.titleMedium),
                   const Spacer(),
                   Text(
                     '${_selected.length} selected',

@@ -43,7 +43,7 @@ $PSQL -d "$DB" -c "grant all on all tables in schema public to service_role"
 $PSQL -d "$DB" -c "grant all on all sequences in schema public to service_role"
 
 echo "→ RLS tests"
-for f in supabase/tests/10_rls_test.sql supabase/tests/40_live_chat_test.sql supabase/tests/50_force_audio_test.sql supabase/tests/60_groups_test.sql; do
+for f in supabase/tests/10_rls_test.sql supabase/tests/40_live_chat_test.sql supabase/tests/50_force_audio_test.sql supabase/tests/60_groups_test.sql supabase/tests/70_calls_test.sql; do
   [ -f "$f" ] || continue
   echo "  · $f"
   # ON_ERROR_STOP makes psql exit non-zero as soon as an assertion block raises.

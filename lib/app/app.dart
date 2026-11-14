@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/app_config.dart';
 import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
+import '../features/calls/application/call_controller.dart';
 import '../features/notifications/application/push_message_controller.dart';
 import '../features/notifications/domain/push_message.dart';
 import '../features/shell/presentation/config_missing_screen.dart';
@@ -38,6 +39,17 @@ class PulseApp extends ConsumerWidget {
       _log.info('force_audio_open_requested');
       ref.read(pushMessageProvider.notifier).dismiss();
       router.go('/force-audio/$alertId');
+    });
+
+    // An incoming call takes over the screen too — but only when the server row
+    // is the one that says "ringing" (incomingCallProvider reads `calls`, it does
+    // not invent anything).
+    ref.listen<AsyncValue<String?>>(incomingCallProvider, (previous, next) {
+      final callId = next.value;
+      if (callId == null || callId.isEmpty) return;
+      if (previous?.value == callId) return;
+      _log.info('incoming_call_open_requested');
+      router.push('/call/$callId');
     });
 
     return MaterialApp.router(

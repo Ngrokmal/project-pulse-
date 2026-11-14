@@ -86,17 +86,20 @@ class Conversation {
   bool get isGroup => kind == 'group';
 
   /// What the list and the chat header show.
-  String get displayName =>
-      isGroup ? (title?.trim().isNotEmpty == true ? title! : 'Group') : peer.displayName;
+  String get displayName => isGroup
+      ? (title?.trim().isNotEmpty == true ? title! : 'Group')
+      : peer.displayName;
 
-  String get subtitleLabel =>
-      isGroup ? '$memberCount ${memberCount == 1 ? 'member' : 'members'}' : '@${peer.username ?? 'pulse'}';
+  String get subtitleLabel => isGroup
+      ? '$memberCount ${memberCount == 1 ? 'member' : 'members'}'
+      : '@${peer.username ?? 'pulse'}';
 
   String get initials {
     if (!isGroup) return peer.initials;
     final clean = displayName.trim();
     return clean.isEmpty ? '#' : clean[0].toUpperCase();
   }
+
   final DateTime? lastMessageAt;
   final String? lastMessagePreview;
   final String? lastMessageSenderId;
