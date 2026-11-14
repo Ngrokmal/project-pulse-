@@ -48,6 +48,6 @@ for f in supabase/tests/10_rls_test.sql supabase/tests/40_live_chat_test.sql sup
   echo "  · $f"
   # ON_ERROR_STOP makes psql exit non-zero as soon as an assertion block raises.
   out=$($PSQL -d "$DB" -f "$f" 2>&1) || { printf '%s\n' "$out" | tail -20; exit 1; }
-  printf '%s\n' "$out" | grep -E 'FAIL|assertions passed|ALL RLS TESTS PASSED' || true
+  printf '%s\n' "$out" | grep -E 'FAIL|assertions passed|attacks were correctly refused|ALL RLS TESTS PASSED' || true
 done
 echo "ALL RLS TESTS PASSED"
