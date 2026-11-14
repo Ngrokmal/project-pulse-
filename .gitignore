@@ -54,3 +54,8 @@ app.*.map.json
 key.properties
 android/key.properties
 firebase/service-account.json
+
+# Release signing material — must never be committed (§2/§31)
+android/key.properties
+*.jks
+*.keystore

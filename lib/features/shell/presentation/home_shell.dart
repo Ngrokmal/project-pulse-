@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../auth/application/auth_controller.dart';
+import '../../account_status/presentation/account_gate.dart';
 import '../../calls/presentation/calls_screen.dart';
 import '../../inbox/presentation/inbox_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
@@ -28,17 +28,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authControllerProvider);
-    final email = auth is AuthSignedIn ? (auth.user.email ?? '') : '';
-
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: [
-          const InboxScreen(),
-          const CallsScreen(),
-          ProfileScreen(email: email),
-        ],
+      body: AccountGate(
+        child: IndexedStack(
+          index: _index,
+          children: const [InboxScreen(), CallsScreen(), ProfileScreen()],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
+import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
@@ -36,6 +37,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/app',
         name: 'app',
         pageBuilder: (context, state) => _fade(state, const HomeShell()),
+      ),
+      GoRoute(
+        path: '/profile/edit',
+        name: 'edit-profile',
+        pageBuilder: (context, state) =>
+            _fade(state, const EditProfileScreen()),
       ),
       GoRoute(
         path: '/design',

@@ -12,8 +12,26 @@ concurrency:
 
 env:
   FLUTTER_VERSION: "3.50.0"
+  # Public fingerprint of the Pulse upload certificate (safe to publish; the
+  # keystore itself is a secret). Used to prove CI produced a properly signed APK.
+  UPLOAD_CERT_SHA256: "80:1B:67:A4:5A:40:BA:B8:D2:F8:43:8C:2C:55:45:2B:BE:BD:09:04:71:21:85:29:BC:7B:73:E0:C9:2D:11:23"
 
 jobs:
+  migrations:
+    name: Migrations & RLS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql
+          pg_config --version
+
+      - name: Apply migrations to a fresh database and run the RLS suite
+        run: bash supabase/tests/run_local.sh
+
   analyze-and-test:
     name: Analyze & test
     runs-on: ubuntu-latest
@@ -67,12 +85,47 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::No keystore secret set - the APK will be debug-signed."
+            exit 0
+          fi
+          mkdir -p "$RUNNER_TEMP/signing"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/signing/pulse-upload.jks"
+          {
+            printf 'storeFile=%s\n' "$RUNNER_TEMP/signing/pulse-upload.jks"
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > android/key.properties
+          echo "keystore ready ($(wc -c < "$RUNNER_TEMP/signing/pulse-upload.jks") bytes)"
+
       - name: Build release APK
         run: |
           flutter build apk --release \
             --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
             --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
             --dart-define=CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUD_NAME }}"
+
+      - name: Assert the APK is signed with the Pulse upload key
+        run: |
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
+          "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
+          if [ -f android/key.properties ]; then
+            EXPECTED="${{ env.UPLOAD_CERT_SHA256 }}"
+            grep -qi "$EXPECTED" /tmp/certs.txt \
+              || { echo "::error::APK not signed with the Pulse upload certificate"; exit 1; }
+            echo "signed with the upload certificate"
+          else
+            echo "::warning::debug-signed build (no keystore secret configured)"
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
