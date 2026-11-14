@@ -188,6 +188,59 @@ check "media_bytes = 0 is rejected by the check constraint" "400" "$(code POST "
 check "an unknown kind is rejected" "400" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"malware\",\"body\":\"x\",\"client_id\":\"qa-kind-$RANDOM$RANDOM\"}" "$TOKEN")"
 check "a text message still requires a non-empty body" "400" "$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"text\",\"body\":\"\",\"client_id\":\"qa-empty-$RANDOM$RANDOM\"}" "$TOKEN")"
 
+echo "== 8c. Force Audio alerts (0005) =="
+FA_URL="https://res.cloudinary.com/kojvlesm/raw/upload/v1/pulse/messages/qa-fa.m4a"
+FA_REQ="qa-fa-$RANDOM$RANDOM"
+code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"force_audio\",\"body\":\"\",\"media_url\":\"$FA_URL\",\"media_bytes\":240000,\"duration_ms\":42000,\"client_id\":\"qa-famsg-$RANDOM$RANDOM\"}" "$TOKEN" >/dev/null
+FA_MSG=$(jget "[0]['id']")
+check "A sends a force_audio message (empty body, media_url + duration)" "$FA_URL" "$(code GET "$SUPABASE_URL/rest/v1/messages?select=media_url&kind=eq.force_audio&conversation_id=eq.$CONV1&order=created_at.desc&limit=1" "" "$TOKEN" >/dev/null; jget "[0]['media_url']")"
+check "the conversation preview says force audio" "Force audio alert" "$(code GET "$SUPABASE_URL/rest/v1/conversations?select=last_message_preview&id=eq.$CONV1" "" "$TOKEN" >/dev/null; jget "[0]['last_message_preview']")"
+check "A creates the alert" "201" "$(code POST "$SUPABASE_URL/rest/v1/force_audio_alerts" "{\"request_id\":\"$FA_REQ\",\"conversation_id\":\"$CONV1\",\"message_id\":\"$FA_MSG\",\"sender_id\":\"$UID_\",\"recipient_id\":\"$UID2_\",\"media_url\":\"$FA_URL\",\"duration_ms\":42000,\"size_bytes\":240000}" "$TOKEN")"
+check "alert starts as created" "created" "$(jget "[0]['state']")"
+check "the server sets the expiry, not the client" "1" "$(python3 -c "
+import json,datetime
+d=json.load(open('/tmp/api_body'))[0]
+exp=datetime.datetime.fromisoformat(d['expires_at'].replace('Z','+00:00'))
+print(1 if (exp - datetime.datetime.now(datetime.timezone.utc)).total_seconds() > 80000 else 0)")"
+check "B (the receiver) can read it" "200" "$(code GET "$SUPABASE_URL/rest/v1/force_audio_alerts?select=id,state&request_id=eq.$FA_REQ" "" "$TOKEN2")"
+check "…exactly one row" "1" "$(jlen)"
+check "replaying request_id collides (409)" "409" "$(code POST "$SUPABASE_URL/rest/v1/force_audio_alerts" "{\"request_id\":\"$FA_REQ\",\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"recipient_id\":\"$UID2_\",\"media_url\":\"$FA_URL\",\"duration_ms\":42000,\"size_bytes\":240000}" "$TOKEN")"
+check "71 s is rejected by the database" "400" "$(code POST "$SUPABASE_URL/rest/v1/force_audio_alerts" "{\"request_id\":\"$FA_REQ-x1\",\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"recipient_id\":\"$UID2_\",\"media_url\":\"$FA_URL\",\"duration_ms\":71000,\"size_bytes\":240000}" "$TOKEN")"
+check "11 MiB is rejected by the database" "400" "$(code POST "$SUPABASE_URL/rest/v1/force_audio_alerts" "{\"request_id\":\"$FA_REQ-x2\",\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"recipient_id\":\"$UID2_\",\"media_url\":\"$FA_URL\",\"duration_ms\":42000,\"size_bytes\":11534336}" "$TOKEN")"
+check "a non-Cloudinary URL is rejected" "400" "$(code POST "$SUPABASE_URL/rest/v1/force_audio_alerts" "{\"request_id\":\"$FA_REQ-x3\",\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"recipient_id\":\"$UID2_\",\"media_url\":\"https://evil.example.com/x.m4a\",\"duration_ms\":42000,\"size_bytes\":240000}" "$TOKEN")"
+check "the client cannot preset state" "403" "$(code POST "$SUPABASE_URL/rest/v1/force_audio_alerts" "{\"request_id\":\"$FA_REQ-x4\",\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"recipient_id\":\"$UID2_\",\"media_url\":\"$FA_URL\",\"duration_ms\":42000,\"size_bytes\":240000,\"state\":\"played\"}" "$TOKEN")"
+check "the sender cannot mark its own alert played (0 rows)" "200" "$(code PATCH "$SUPABASE_URL/rest/v1/force_audio_alerts?request_id=eq.$FA_REQ" '{"state":"played"}' "$TOKEN")"
+check "…it is still created" "created" "$(code GET "$SUPABASE_URL/rest/v1/force_audio_alerts?select=state&request_id=eq.$FA_REQ" "" "$TOKEN" >/dev/null; jget "[0]['state']")"
+check "the receiver marks it played" "200" "$(code PATCH "$SUPABASE_URL/rest/v1/force_audio_alerts?request_id=eq.$FA_REQ" '{"state":"played"}' "$TOKEN2")"
+check "played_at was stamped by the server" "yes" "$(python3 -c "import json;d=json.load(open('/tmp/api_body'));print('yes' if d and d[0]['played_at'] else 'no')")"
+check "a played alert is terminal" "400" "$(code PATCH "$SUPABASE_URL/rest/v1/force_audio_alerts?request_id=eq.$FA_REQ" '{"state":"delivered"}' "$TOKEN2")"
+check "the sender cannot delete the alert" "403" "$(code DELETE "$SUPABASE_URL/rest/v1/force_audio_alerts?request_id=eq.$FA_REQ" "" "$TOKEN")"
+psql "$SUPABASE_DB_URL" -qtAc "delete from public.force_audio_alerts where request_id like 'qa-fa-%'" >/dev/null 2>&1
+
+echo "== 8d. force-audio-create Edge Function (deployed) =="
+FA_AUDIO="https://res.cloudinary.com/kojvlesm/video/upload/v1794670207/pulse/messages/tvxjnl7xqdtqokanwrzc.wav"
+# A device token that FCM will reject: proves the function really called Google.
+DEAD_TOKEN="dead$(date +%s)$RANDOM$(printf 'A%.0s' {1..120})"
+code POST "$SUPABASE_URL/rest/v1/fcm_tokens" "{\"user_id\":\"$UID2_\",\"token\":\"$DEAD_TOKEN\",\"platform\":\"android\"}" "$TOKEN2" >/dev/null
+check "the receiver's device token started active" "True" "$(code GET "$SUPABASE_URL/rest/v1/fcm_tokens?select=is_active&token=eq.$DEAD_TOKEN" "" "$TOKEN2" >/dev/null; jget "[0]['is_active']")"
+
+FA_MSG2=$(code POST "$SUPABASE_URL/rest/v1/messages" "{\"conversation_id\":\"$CONV1\",\"sender_id\":\"$UID_\",\"kind\":\"force_audio\",\"body\":\"\",\"media_url\":\"$FA_AUDIO\",\"media_bytes\":96044,\"duration_ms\":3000,\"client_id\":\"qa-fnmsg-$RANDOM$RANDOM\"}" "$TOKEN" >/dev/null; jget "[0]['id']")
+FA_FN_REQ="fn-req-$RANDOM$RANDOM"
+FA_FN_BODY="{\"requestId\":\"$FA_FN_REQ\",\"conversationId\":\"$CONV1\",\"recipientId\":\"$UID2_\",\"mediaUrl\":\"$FA_AUDIO\",\"durationMs\":3000,\"sizeBytes\":96044,\"messageId\":\"$FA_MSG2\"}"
+FN_CODE=$(curl -s -o /tmp/fn_body -w '%{http_code}' -X POST "$SUPABASE_URL/functions/v1/force-audio-create" -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$FA_FN_BODY")
+check "the Edge Function is deployed and accepts the caller" "200" "$FN_CODE"
+check "…and reports ok" "True" "$(python3 -c "import json;print(json.load(open('/tmp/fn_body')).get('ok'))" 2>/dev/null || echo None)"
+check "…creating a real alert row" "1" "$(python3 -c "import json;d=json.load(open('/tmp/fn_body'));print(1 if d['alert']['id'] else 0)" 2>/dev/null || echo 0)"
+check "…that the receiver can read" "200" "$(code GET "$SUPABASE_URL/rest/v1/force_audio_alerts?select=state&request_id=eq.$FA_FN_REQ" "" "$TOKEN2")"
+check "replaying the same requestId through the function is idempotent" "$FA_FN_REQ" "$(curl -s -X POST "$SUPABASE_URL/functions/v1/force-audio-create" -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$FA_FN_BODY" | python3 -c "import json,sys;print(json.load(sys.stdin)['alert']['request_id'])" 2>/dev/null)"
+check "the push really reached FCM, so the dead token was retired" "False" "$(code GET "$SUPABASE_URL/rest/v1/fcm_tokens?select=is_active&token=eq.$DEAD_TOKEN" "" "$TOKEN2" >/dev/null; jget "[0]['is_active']")"
+check "71 s is refused by the function" "400" "$(curl -s -o /tmp/fn_body -w '%{http_code}' -X POST "$SUPABASE_URL/functions/v1/force-audio-create" -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"requestId\":\"fn-long-$RANDOM$RANDOM\",\"conversationId\":\"$CONV1\",\"recipientId\":\"$UID2_\",\"mediaUrl\":\"$FA_AUDIO\",\"durationMs\":71000,\"sizeBytes\":96044}")"
+check "…with a field-level reason" "durationMs" "$(python3 -c "import json;d=json.load(open('/tmp/fn_body'));print(d['error']['fields'][0]['field'])" 2>/dev/null || echo none)"
+check "an off-Cloudinary URL is refused" "400" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$SUPABASE_URL/functions/v1/force-audio-create" -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "{\"requestId\":\"fn-evil-$RANDOM$RANDOM\",\"conversationId\":\"$CONV1\",\"recipientId\":\"$UID2_\",\"mediaUrl\":\"https://evil.example.com/a.m4a\",\"durationMs\":3000,\"sizeBytes\":96044}")"
+check "a caller with no session is refused" "401" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$SUPABASE_URL/functions/v1/force-audio-create" -H "apikey: $SUPABASE_ANON_KEY" -H 'Content-Type: application/json' -d "$FA_FN_BODY")"
+code DELETE "$SUPABASE_URL/rest/v1/fcm_tokens?token=eq.$DEAD_TOKEN" "" "$TOKEN2" >/dev/null
+psql "$SUPABASE_DB_URL" -qtAc "delete from public.force_audio_alerts where request_id like 'fn-req-%' or request_id like 'qa-fa-%'" >/dev/null 2>&1
+
 echo "== 9. anon (no session) is fenced off =="
 check "anon GET profiles denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/profiles?select=id")"
 check "anon GET account_status denied" "401" "$(code GET "$SUPABASE_URL/rest/v1/account_status?select=status")"

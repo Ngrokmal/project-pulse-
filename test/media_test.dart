@@ -101,7 +101,7 @@ void main() {
       expect(asset.secureUrl, startsWith('https://res.cloudinary.com/'));
     });
 
-    test('video uploads carry a duration', () {
+    test('video uploads carry a duration (Cloudinary reports seconds)', () {
       final asset = CloudinaryAsset.fromJson({
         'secure_url': 'https://res.cloudinary.com/x/video/upload/v1/a.mp4',
         'public_id': 'pulse/messages/a',
@@ -110,7 +110,7 @@ void main() {
         'duration': 12.6,
       }, MediaResourceType.video);
       expect(asset.resourceType, MediaResourceType.video);
-      expect(asset.durationMs, 13);
+      expect(asset.durationMs, 12600);
     });
 
     test('unknown resource_type falls back to what we asked for', () {

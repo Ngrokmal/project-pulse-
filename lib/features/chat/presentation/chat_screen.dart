@@ -11,6 +11,8 @@ import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/chat_controller.dart';
 import '../../media/presentation/media_bubble.dart';
+import '../../force_audio/presentation/force_audio_bubble.dart';
+import '../../force_audio/presentation/force_audio_sheet.dart';
 import '../../media/application/media_controller.dart';
 import '../../media/data/file_picker_source.dart';
 import '../../media/domain/media_asset.dart';
@@ -214,6 +216,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             _Composer(
               controller: _controller,
               onAttach: _sending ? null : _attach,
+              onForceAudio: _sending
+                  ? null
+                  : () => showForceAudioSheet(
+                      context,
+                      conversationId: widget.conversationId,
+                    ),
               sending: _sending,
               onSend: _send,
               onTyping: () => ref
@@ -322,7 +330,13 @@ class _Bubble extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!message.isDeleted &&
+          if (!message.isDeleted && message.kind == MessageKind.forceAudio)
+            ForceAudioBubble(
+              messageId: message.id,
+              mine: mine,
+              durationMs: message.durationMs,
+            )
+          else if (!message.isDeleted &&
               message.kind != MessageKind.text &&
               message.mediaUrl != null)
             MediaBubble(message: message, mine: mine)
@@ -465,11 +479,13 @@ class _Composer extends StatelessWidget {
     required this.onSend,
     required this.onTyping,
     this.onAttach,
+    this.onForceAudio,
   });
 
   final TextEditingController controller;
   final bool sending;
   final VoidCallback? onAttach;
+  final VoidCallback? onForceAudio;
   final VoidCallback onSend;
   final VoidCallback onTyping;
 
@@ -489,6 +505,12 @@ class _Composer extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
+          IconButton(
+            tooltip: 'Record a Force Audio',
+            onPressed: onForceAudio,
+            icon: const Icon(Icons.mic_rounded),
+            color: AppColors.brand600,
+          ),
           IconButton(
             tooltip: 'Attach a photo, video or file',
             onPressed: onAttach,

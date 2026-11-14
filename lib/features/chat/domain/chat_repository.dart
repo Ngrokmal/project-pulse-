@@ -23,6 +23,7 @@ abstract interface class ChatRepository {
     MessageKind kind = MessageKind.text,
     String? mediaUrl,
     int? mediaBytes,
+    int? durationMs,
   });
 
   /// Soft-deletes one of my own messages.

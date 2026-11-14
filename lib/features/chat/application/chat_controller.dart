@@ -12,6 +12,8 @@ import '../data/chat_local_store.dart';
 import '../data/supabase_chat_repository.dart';
 import '../domain/chat_repository.dart';
 import '../domain/conversation.dart';
+import '../../force_audio/application/force_audio_providers.dart';
+import '../../force_audio/domain/force_audio_alert.dart';
 import '../../media/application/media_controller.dart';
 import '../../media/domain/media_asset.dart';
 import '../domain/message.dart';
@@ -259,6 +261,87 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
     } finally {
       upload.clear();
     }
+  }
+
+  /// Sends a Force Audio: the message row plus the alert row that lets the
+  /// receiver verify it. Returns the alert, or null when only the message landed
+  /// (the caller reports that honestly instead of claiming success).
+  Future<ForceAudioAlert?> sendForceAudio({
+    required String mediaUrl,
+    required int sizeBytes,
+    required int durationMs,
+  }) async {
+    final current = state.value ?? const ChatThreadState(messages: []);
+    final clientId = _uuid.v4();
+    final auth = ref.read(authControllerProvider);
+    final myId = auth is AuthSignedIn ? auth.user.id : '';
+
+    final recipientId = _recipientId();
+    if (recipientId == null) {
+      throw const ValidationFailure(
+        'force_audio',
+        'Could not work out who to send this to. Reopen the chat and retry.',
+      );
+    }
+
+    final optimistic = Message(
+      id: 'pending:$clientId',
+      conversationId: conversationId,
+      senderId: myId,
+      kind: MessageKind.forceAudio,
+      createdAt: DateTime.now(),
+      mediaUrl: mediaUrl,
+      mediaBytes: sizeBytes,
+      clientId: clientId,
+      delivery: DeliveryState.pending,
+    );
+    state = AsyncData(
+      current.copyWith(messages: [...current.messages, optimistic]),
+    );
+
+    try {
+      final saved = await ref
+          .read(chatRepositoryProvider)
+          .sendMessage(
+            conversationId: conversationId,
+            clientId: clientId,
+            body: '',
+            kind: MessageKind.forceAudio,
+            mediaUrl: mediaUrl,
+            mediaBytes: sizeBytes,
+            durationMs: durationMs,
+          );
+      _replace(optimistic.id, saved);
+
+      final alert = await ref
+          .read(forceAudioRepositoryProvider)
+          .createAlert(
+            requestId: clientId,
+            conversationId: conversationId,
+            recipientId: recipientId,
+            mediaUrl: mediaUrl,
+            durationMs: durationMs,
+            sizeBytes: sizeBytes,
+            messageId: saved.id,
+          );
+      return alert;
+    } on AppFailure {
+      _replace(
+        optimistic.id,
+        optimistic.copyWith(delivery: DeliveryState.failed),
+      );
+      rethrow;
+    }
+  }
+
+  /// The other member of this direct conversation, from the conversation list.
+  String? _recipientId() {
+    final conversations = ref.read(conversationsProvider).value;
+    if (conversations == null) return null;
+    for (final c in conversations) {
+      if (c.id == conversationId) return c.peer.id;
+    }
+    return null;
   }
 
   Future<void> _deliver(

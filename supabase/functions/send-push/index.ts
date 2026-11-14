@@ -49,6 +49,15 @@ function decodeClaims(jwt: string): JwtClaims {
   }
 }
 
+
+/** Length-independent comparison: no early exit that leaks a prefix. */
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -74,10 +83,20 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const authHeader = req.headers.get("Authorization") ?? "";
   const callerJwt = authHeader.replace(/^Bearer\s+/i, "");
   const claims = decodeClaims(callerJwt);
+  const serviceKeyHeader = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
   // Admin-only primitive: the mobile app must never be able to push arbitrary
   // notifications to arbitrary accounts.
-  if (claims.role !== "service_role") {
+  //
+  // Two accepted callers, both server-side:
+  //   • a JWT whose role claim is service_role (the legacy anon/service JWT pair)
+  //   • the project's current service key, compared literally. Newer projects
+  //     issue `sb_secret_…` keys that are not JWTs, so the claim check alone
+  //     would lock every server-side caller out of this function.
+  const isServiceJwt = claims.role === "service_role";
+  const isServiceKey = serviceKeyHeader.length > 0 &&
+    timingSafeEqual(callerJwt, serviceKeyHeader);
+  if (!isServiceJwt && !isServiceKey) {
     return json({ ok: false, error: "forbidden", correlationId }, 403);
   }
 

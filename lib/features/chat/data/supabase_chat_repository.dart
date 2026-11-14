@@ -101,6 +101,7 @@ class SupabaseChatRepository implements ChatRepository {
     MessageKind kind = MessageKind.text,
     String? mediaUrl,
     int? mediaBytes,
+    int? durationMs,
   }) async {
     // Media messages carry a URL instead of body text; text messages must not
     // be blank.
@@ -120,6 +121,7 @@ class SupabaseChatRepository implements ChatRepository {
             'body': kind == MessageKind.text ? body.trim() : null,
             'media_url': mediaUrl,
             'media_bytes': mediaBytes,
+            'duration_ms': durationMs,
             'client_id': clientId,
           })
           .select()

@@ -10,13 +10,18 @@ create table if not exists auth.users (
   created_at timestamptz not null default now()
 );
 
--- Supabase exposes the JWT subject through auth.uid()
+-- Supabase exposes the JWT subject through auth.uid(). It reads the JSON
+-- `request.jwt.claims` setting; older code (and some tests) set the single
+-- `request.jwt.claim.sub` value instead, so support both.
 create or replace function auth.uid()
 returns uuid
 language sql
 stable
 as $$
-  select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid;
+  select coalesce(
+    nullif(current_setting('request.jwt.claim.sub', true), '')::uuid,
+    (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')::uuid
+  );
 $$;
 
 do $$

@@ -121,6 +121,9 @@ class CloudinaryAsset {
     format: json['format'] as String?,
     width: (json['width'] as num?)?.toInt(),
     height: (json['height'] as num?)?.toInt(),
-    durationMs: (json['duration'] as num?)?.round(),
+    // Cloudinary reports `duration` in **seconds** (a float), not ms.
+    durationMs: (json['duration'] as num?) == null
+        ? null
+        : ((json['duration'] as num) * 1000).round(),
   );
 }
