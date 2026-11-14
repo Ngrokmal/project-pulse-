@@ -147,7 +147,7 @@ class _ConversationTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
             children: [
-              _Avatar(label: c.peer.initials),
+              _Avatar(label: c.initials),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -157,7 +157,7 @@ class _ConversationTile extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            c.peer.displayName,
+                            c.displayName,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.titleMedium,
@@ -180,7 +180,7 @@ class _ConversationTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       c.lastMessagePreview == null
-                          ? 'Say hello'
+                          ? (c.isGroup ? c.subtitleLabel : 'Say hello')
                           : '${c.isMineLast(myId) ? 'You: ' : ''}${c.lastMessagePreview}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -247,6 +247,18 @@ class _NewChatSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('New chat', style: AppTypography.titleLarge),
+            const SizedBox(height: 6),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  context.push('/group/new');
+                },
+                icon: const Icon(Icons.group_add_rounded, size: 18),
+                label: const Text('New group'),
+              ),
+            ),
             const SizedBox(height: 4),
             Text(
               'Pick someone with a Pulse account.',

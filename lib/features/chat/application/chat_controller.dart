@@ -471,3 +471,9 @@ final startConversationProvider = FutureProvider.family<String, String>((
   ref.invalidate(conversationsProvider);
   return id;
 });
+
+/// Members + roles of a group (RLS returns rows only to members).
+final groupMembersProvider =
+    FutureProvider.family<List<GroupMember>, String>((ref, conversationId) {
+      return ref.watch(chatRepositoryProvider).groupMembers(conversationId);
+    });

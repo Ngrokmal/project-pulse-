@@ -10,6 +10,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/chat_controller.dart';
+import 'group_info_sheet.dart';
 import '../../media/presentation/media_bubble.dart';
 import '../../force_audio/presentation/force_audio_bubble.dart';
 import '../../force_audio/presentation/force_audio_sheet.dart';
@@ -133,7 +134,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              conversation?.peer.displayName ?? 'Chat',
+              conversation?.displayName ?? 'Chat',
               style: AppTypography.titleMedium,
             ),
             if (thread.value?.peerTyping == true)
@@ -148,6 +149,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 'offline — showing saved messages',
                 style: AppTypography.caption.copyWith(color: AppColors.danger),
               )
+            else if (conversation?.isGroup == true)
+              Text(
+                '${conversation!.subtitleLabel} · tap for details',
+                style: AppTypography.caption,
+              )
             else
               Text(
                 conversation?.peer.username == null
@@ -157,6 +163,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
           ],
         ),
+        actions: [
+          if (conversation?.isGroup == true)
+            IconButton(
+              tooltip: 'Group info',
+              icon: const Icon(Icons.info_outline_rounded, size: 20),
+              onPressed: () =>
+                  GroupInfoSheet.show(context, conversation!),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(

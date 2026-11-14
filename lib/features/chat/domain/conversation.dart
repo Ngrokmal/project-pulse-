@@ -36,6 +36,29 @@ extension on String {
   String get characters1 => isEmpty ? '?' : substring(0, 1).toUpperCase();
 }
 
+/// My role in a group conversation. Direct chats have no role.
+enum GroupRole {
+  owner,
+  admin,
+  member;
+
+  static GroupRole? parse(String? raw) => switch (raw) {
+    'owner' => GroupRole.owner,
+    'admin' => GroupRole.admin,
+    'member' => GroupRole.member,
+    _ => null,
+  };
+
+  bool get canManageMembers => this == owner || this == admin;
+  bool get isOwner => this == owner;
+
+  String get label => switch (this) {
+    GroupRole.owner => 'Owner',
+    GroupRole.admin => 'Admin',
+    GroupRole.member => 'Member',
+  };
+}
+
 class Conversation {
   const Conversation({
     required this.id,
@@ -44,10 +67,36 @@ class Conversation {
     this.lastMessagePreview,
     this.lastMessageSenderId,
     this.unreadCount = 0,
+    this.kind = 'direct',
+    this.title,
+    this.memberCount = 0,
+    this.myRole,
   });
 
   final String id;
   final ChatPeer peer;
+
+  /// 'direct' or 'group'. Groups carry a title and a member count instead of a
+  /// meaningful peer.
+  final String kind;
+  final String? title;
+  final int memberCount;
+  final GroupRole? myRole;
+
+  bool get isGroup => kind == 'group';
+
+  /// What the list and the chat header show.
+  String get displayName =>
+      isGroup ? (title?.trim().isNotEmpty == true ? title! : 'Group') : peer.displayName;
+
+  String get subtitleLabel =>
+      isGroup ? '$memberCount ${memberCount == 1 ? 'member' : 'members'}' : '@${peer.username ?? 'pulse'}';
+
+  String get initials {
+    if (!isGroup) return peer.initials;
+    final clean = displayName.trim();
+    return clean.isEmpty ? '#' : clean[0].toUpperCase();
+  }
   final DateTime? lastMessageAt;
   final String? lastMessagePreview;
   final String? lastMessageSenderId;
@@ -62,16 +111,21 @@ class Conversation {
     Map<String, dynamic> map, {
     required String myId,
   }) {
-    final members = (map['conversation_members'] as List<dynamic>? ?? const []);
+    final members = (map['conversation_members'] as List<dynamic>? ?? const [])
+        .cast<Map<String, dynamic>>();
     final other = members
-        .cast<Map<String, dynamic>>()
         .map((m) => m['profiles'] as Map<String, dynamic>?)
         .whereType<Map<String, dynamic>>()
         .where((p) => p['id'] != myId)
         .toList();
     final lastAt = map['last_message_at'] as String?;
+    final mine = members.where((m) => m['user_id'] == myId).firstOrNull;
     return Conversation(
       id: map['id'] as String,
+      kind: (map['kind'] as String?) ?? 'direct',
+      title: map['title'] as String?,
+      memberCount: members.length,
+      myRole: GroupRole.parse(mine?['role'] as String?),
       peer: other.isEmpty
           ? const ChatPeer(id: '', displayName: 'Pulse user')
           : ChatPeer.fromMap(other.first),

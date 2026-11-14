@@ -43,6 +43,44 @@ abstract interface class ChatRepository {
 
   /// People I can start a chat with (everyone but me, for now).
   Future<List<ChatPeerSummary>> people();
+
+  // ------------------------------------------------------------------ groups
+  /// Creates a group and returns its conversation id. The caller becomes owner.
+  Future<String> createGroup({
+    required String title,
+    required List<String> memberIds,
+  });
+
+  /// Members of a conversation with their roles (RLS: members only).
+  Future<List<GroupMember>> groupMembers(String conversationId);
+
+  Future<void> addGroupMember(String conversationId, String userId);
+
+  Future<void> removeGroupMember(String conversationId, String userId);
+
+  Future<void> setGroupRole(
+    String conversationId,
+    String userId,
+    GroupRole role,
+  );
+
+  Future<void> renameGroup(String conversationId, String title);
+
+  Future<void> leaveGroup(String conversationId);
+}
+
+class GroupMember {
+  const GroupMember({
+    required this.userId,
+    required this.displayName,
+    required this.role,
+    this.username,
+  });
+
+  final String userId;
+  final String displayName;
+  final GroupRole? role;
+  final String? username;
 }
 
 class ChatPeerSummary {

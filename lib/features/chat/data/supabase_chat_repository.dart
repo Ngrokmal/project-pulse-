@@ -35,13 +35,14 @@ class SupabaseChatRepository implements ChatRepository {
       final rows = await _client
           .from('conversations')
           .select(
-            'id, last_message_at, last_message_preview, last_message_sender, '
-            'conversation_members(user_id, last_read_at, profiles(id, display_name, username, avatar_url))',
+            'id, kind, title, last_message_at, last_message_preview, last_message_sender, '
+            'conversation_members(user_id, role, last_read_at, '
+            'profiles(id, display_name, username, avatar_url))',
           )
           .order('last_message_at', ascending: false, nullsFirst: false);
       return rows
           .map((r) => Conversation.fromMap(r, myId: me))
-          .where((c) => c.peer.id.isNotEmpty)
+          .where((c) => c.isGroup || c.peer.id.isNotEmpty)
           .toList();
     } on PostgrestException catch (e) {
       throw _map(e, 'conversations');
@@ -245,9 +246,127 @@ class SupabaseChatRepository implements ChatRepository {
     }
   }
 
+  // ------------------------------------------------------------------ groups
+  static const _groupErrorCodes = {
+    'not_a_member',
+    'not_allowed',
+    'owner_only',
+    'invalid_title',
+    'member_not_found',
+    'group_full',
+  };
+
+  @override
+  Future<String> createGroup({
+    required String title,
+    required List<String> memberIds,
+  }) async {
+    try {
+      final result = await _client.rpc(
+        'create_group',
+        params: {'p_title': title, 'p_members': memberIds},
+      );
+      return result as String;
+    } on PostgrestException catch (e) {
+      throw _map(e, 'createGroup');
+    }
+  }
+
+  @override
+  Future<List<GroupMember>> groupMembers(String conversationId) async {
+    try {
+      final rows = await _client
+          .from('conversation_members')
+          .select('user_id, role, profiles(id, display_name, username)')
+          .eq('conversation_id', conversationId);
+      final members = rows.map((r) {
+        final profile = r['profiles'] as Map<String, dynamic>?;
+        final name = (profile?['display_name'] as String?)?.trim();
+        return GroupMember(
+          userId: r['user_id'] as String,
+          displayName: name?.isNotEmpty == true ? name! : 'Pulse user',
+          username: profile?['username'] as String?,
+          role: GroupRole.parse(r['role'] as String?),
+        );
+      }).toList();
+      members.sort((a, b) {
+        int rank(GroupRole? r) => switch (r) {
+          GroupRole.owner => 0,
+          GroupRole.admin => 1,
+          _ => 2,
+        };
+        final byRole = rank(a.role).compareTo(rank(b.role));
+        return byRole != 0
+            ? byRole
+            : a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase());
+      });
+      return members;
+    } on PostgrestException catch (e) {
+      throw _map(e, 'groupMembers');
+    }
+  }
+
+  @override
+  Future<void> addGroupMember(String conversationId, String userId) =>
+      _groupRpc('add_group_member', 'addGroupMember', {
+        'p_conversation': conversationId,
+        'p_user': userId,
+      });
+
+  @override
+  Future<void> removeGroupMember(String conversationId, String userId) =>
+      _groupRpc('remove_group_member', 'removeGroupMember', {
+        'p_conversation': conversationId,
+        'p_user': userId,
+      });
+
+  @override
+  Future<void> setGroupRole(
+    String conversationId,
+    String userId,
+    GroupRole role,
+  ) => _groupRpc('set_group_role', 'setGroupRole', {
+    'p_conversation': conversationId,
+    'p_user': userId,
+    'p_role': role.name,
+  });
+
+  @override
+  Future<void> renameGroup(String conversationId, String title) =>
+      _groupRpc('rename_group', 'renameGroup', {
+        'p_conversation': conversationId,
+        'p_title': title,
+      });
+
+  @override
+  Future<void> leaveGroup(String conversationId) => _groupRpc(
+    'leave_group',
+    'leaveGroup',
+    {'p_conversation': conversationId},
+  );
+
+  Future<void> _groupRpc(
+    String fn,
+    String op,
+    Map<String, dynamic> params,
+  ) async {
+    try {
+      await _client.rpc(fn, params: params);
+    } on PostgrestException catch (e) {
+      throw _map(e, op);
+    }
+  }
+
   AppFailure _map(PostgrestException e, String op) {
     _log.warning(op, error: '${e.code}');
     final text = e.message.toLowerCase();
+    final reason = _groupErrorCodes.firstWhere(
+      (code) => text.contains(code),
+      orElse: () => '',
+    );
+    if (reason.isNotEmpty) {
+      return ServerFailure(safeCode: reason, statusCode: 403);
+    }
     if (text.contains('socket') ||
         text.contains('connection') ||
         text.contains('host lookup')) {
