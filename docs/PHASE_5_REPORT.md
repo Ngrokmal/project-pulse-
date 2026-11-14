@@ -235,3 +235,69 @@ One CI failure happened on the way here and is fixed: `deno test` runs without
 `--allow-net`, and importing `force-audio-create/index.ts` executed `Deno.serve`
 at import time. The validation moved to `lib.ts` (same layout as `send-push`), so
 the tests import only the pure code.
+
+---
+
+# Phase 5c — the notification actually takes over the screen
+
+**Commit:** `d2e5013` · **CI run:** `43615890546` (4/4 green) ·
+**Artifact:** `pulse-release-apk`, 32.4 MB, id `14122256773`
+
+This closes the last piece of §5 on the receiving side: a tapped Force Audio push
+now opens a full-screen takeover instead of dropping the user into the chat.
+
+## What happens on a tap
+
+```
+notification tap ──► PushMessage(opened: true) ──► route /force-audio/<alertId>
+                                                      │
+   verify the alert id with the server ───────────────┘
+   ▼
+ "Checking for new messages"  ← stays for the whole download, never a fake bar
+   ▼  real received bytes
+ "Downloading 63%" + progress bar
+   ▼
+ plays once → state played (server) + Hive guard (device)
+   ▼
+ "Played" + Close
+```
+
+- **Cold start works**: a tap that launches the app from a terminated state is
+  handled through `getInitialMessage()`, so the route is applied after the router
+  exists.
+- **Foreground pushes stay banners**: `PushMessage.opened` is only true for a tap.
+  Tapping a Force Audio banner opens the same screen; a normal chat banner still
+  goes to the inbox.
+- **No fake progress**: every percentage on that screen is bytes received, and an
+  alert that is expired, unknown or already played never downloads anything.
+
+## Verified
+
+| Check | Result |
+|---|---|
+| `dart analyze lib test` | **No issues found** |
+| `flutter test` | **94 passed, 3 skipped** (was 88/3) |
+| New widget tests | unknown alert → "This alert is not available"; played alert → "Played" + Close, no re-fetch; expired alert → refused **before** any download (`downloader.calls == 0`) |
+| New push-model tests | a foreground push is **not** `opened`; a tap is `opened` and carries the alert id; a chat tap is `opened` but not Force Audio |
+| Artifact really contains 5c | `libapp.so` in the downloaded APK contains `/force-audio/` (×2) and `Checking for new messages` |
+| Release manifest | CI gate printed `network + notification + microphone permissions present` |
+
+## Files
+
+- `lib/features/force_audio/presentation/force_audio_screen.dart` — the takeover.
+- `lib/app/app.dart` — listens for an *opened* Force Audio push and routes to it.
+- `lib/app/router/app_router.dart` — `/force-audio/:alertId`.
+- `lib/features/notifications/domain/push_message.dart` — `opened` flag.
+- `lib/features/notifications/presentation/push_banner.dart` — banner tap routing.
+
+## Remaining, stated plainly
+
+1. **Physical-device behaviour is unverified by me** (no phone, no `/dev/kvm`):
+   the mic prompt, Doze/battery saver, background delivery, and the notification
+   tap on a real Android build. Everything above the OS boundary is tested; the
+   OS boundary is yours.
+2. **Full-screen intent** (the alert shows over the lock screen) is not enabled —
+   Android 14+ restricts it to calling/alarm apps and Play will reject misuse. The
+   current behaviour is a high-priority notification that opens the takeover on
+   tap, which is the compliant path.
+3. Phase 6 (voice/video calls) has not started.
