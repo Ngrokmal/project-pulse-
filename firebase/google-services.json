@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "664127207271",
+    "project_id": "pulse-2f3a4",
+    "storage_bucket": "pulse-2f3a4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664127207271:android:cab2f0a32a3b4e29d5a1c2",
+        "android_client_info": {
+          "package_name": "com.pulsemessenger.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBHvbX7Y71umNTm3eDDKdvelL13RQgpKe4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
