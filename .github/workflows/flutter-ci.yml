@@ -119,10 +119,12 @@ jobs:
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
           if [ -f android/key.properties ]; then
-            EXPECTED="${{ env.UPLOAD_CERT_SHA256 }}"
-            grep -qi "$EXPECTED" /tmp/certs.txt \
-              || { echo "::error::APK not signed with the Pulse upload certificate"; exit 1; }
-            echo "signed with the upload certificate"
+            GOT=$(grep -i 'certificate SHA-256 digest' /tmp/certs.txt | head -1 | awk '{print $NF}' | tr -d ':' | tr 'A-Z' 'a-z')
+            EXP=$(printf '%s' "${{ env.UPLOAD_CERT_SHA256 }}" | tr -d ':' | tr 'A-Z' 'a-z')
+            echo "expected: $EXP"
+            echo "actual  : $GOT"
+            [ "$GOT" = "$EXP" ] || { echo "::error::APK not signed with the Pulse upload certificate"; exit 1; }
+            echo "signature verified against the published upload certificate"
           else
             echo "::warning::debug-signed build (no keystore secret configured)"
           fi
