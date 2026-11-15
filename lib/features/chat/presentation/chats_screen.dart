@@ -11,6 +11,8 @@ import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
 import '../application/chat_controller.dart';
 import '../domain/conversation.dart';
+import 'widgets/chat_avatar.dart';
+import 'widgets/empty_chats_art.dart';
 
 /// Home = the real conversation list, not a placeholder (§4 A).
 class ChatsScreen extends ConsumerWidget {
@@ -64,7 +66,7 @@ class ChatsScreen extends ConsumerWidget {
                 ),
                 error: (error, _) => SliverFillRemaining(
                   hasScrollBody: false,
-                  child: PulseErrorState(
+                  child: ChatsErrorView(
                     failure: error is AppFailure
                         ? error
                         : const ServerFailure(),
@@ -76,14 +78,10 @@ class ChatsScreen extends ConsumerWidget {
                   if (items.isEmpty) {
                     return SliverFillRemaining(
                       hasScrollBody: false,
-                      child: PulseEmptyState(
-                        icon: Icons.forum_outlined,
-                        title: 'No conversations yet',
-                        message:
-                            'Start a chat with someone and it will appear here. '
-                            'Messages are delivered instantly and stay readable offline.',
-                        actionLabel: 'Start a chat',
-                        onAction: () => _openNewChatSheet(context, ref),
+                      child: Center(
+                        child: EmptyChatsArt(
+                          onStartChat: () => _openNewChatSheet(context, ref),
+                        ),
                       ),
                     );
                   }
@@ -97,7 +95,7 @@ class ChatsScreen extends ConsumerWidget {
                         AppSpacing.screenX,
                         i == items.length - 1 ? 90 : 0,
                       ),
-                      child: _ConversationTile(
+                      child: ConversationTile(
                         conversation: items[i],
                         myId: myId,
                       ),
@@ -127,8 +125,14 @@ class ChatsScreen extends ConsumerWidget {
   }
 }
 
-class _ConversationTile extends StatelessWidget {
-  const _ConversationTile({required this.conversation, required this.myId});
+/// One row of the inbox. Public so the layout can be widget-tested without
+/// standing up the whole screen.
+class ConversationTile extends StatelessWidget {
+  const ConversationTile({
+    super.key,
+    required this.conversation,
+    required this.myId,
+  });
 
   final Conversation conversation;
   final String myId;
@@ -137,59 +141,123 @@ class _ConversationTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final c = conversation;
     final time = c.lastMessageAt;
-    return Material(
-      color: AppColors.card,
-      borderRadius: AppRadius.cardRadius,
-      child: InkWell(
+    final unread = c.unreadCount;
+    final hasUnread = unread > 0;
+
+    final preview = c.lastMessagePreview;
+    // What the second line says, in priority order: the real preview, then the
+    // group's member count, then an invitation.
+    final String line;
+    if (preview != null && preview.trim().isNotEmpty) {
+      line = '${c.isMineLast(myId) ? 'You: ' : ''}$preview';
+    } else if (c.isGroup) {
+      line = '${c.subtitleLabel} · no messages yet';
+    } else {
+      line = 'Say hello';
+    }
+
+    return Semantics(
+      button: true,
+      label:
+          '${c.displayName}, '
+          '${hasUnread ? '$unread unread, ' : ''}$line',
+      child: Material(
+        color: AppColors.card,
         borderRadius: AppRadius.cardRadius,
-        onTap: () => context.push('/chat/${c.id}'),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          child: Row(
-            children: [
-              _Avatar(label: c.initials),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            c.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.titleMedium,
-                          ),
-                        ),
-                        if (time != null)
-                          Text(
-                            _formatTime(time),
-                            style: AppTypography.caption.copyWith(
-                              color: c.hasUnread
-                                  ? AppColors.brand600
-                                  : AppColors.textMuted,
-                              fontWeight: c.hasUnread
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+        child: InkWell(
+          borderRadius: AppRadius.cardRadius,
+          onTap: () => context.push('/chat/${c.id}'),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 11, 14, 11),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                ChatAvatar(
+                  label: c.initials,
+                  isGroup: c.isGroup,
+                  imageUrl: c.avatarUrl,
+                  size: 52,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              c.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.titleMedium.copyWith(
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w600,
+                              ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      c.lastMessagePreview == null
-                          ? (c.isGroup ? c.subtitleLabel : 'Say hello')
-                          : '${c.isMineLast(myId) ? 'You: ' : ''}${c.lastMessagePreview}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: AppTypography.caption,
-                    ),
-                  ],
+                          if (c.isGroup && c.memberCount > 0) ...[
+                            const SizedBox(width: 6),
+                            _Pill(
+                              icon: Icons.groups_rounded,
+                              text: '${c.memberCount}',
+                            ),
+                          ],
+                          const Spacer(),
+                          if (time != null)
+                            Text(
+                              _formatTime(time),
+                              style: AppTypography.caption.copyWith(
+                                color: hasUnread
+                                    ? AppColors.brand600
+                                    : AppColors.textMuted,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          if (c.isMineLast(myId) && preview != null)
+                            const Padding(
+                              padding: EdgeInsets.only(right: 3),
+                              child: Icon(
+                                Icons.done_all_rounded,
+                                size: 14,
+                                color: AppColors.brand600,
+                              ),
+                            ),
+                          Expanded(
+                            child: Text(
+                              line,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.caption.copyWith(
+                                color: hasUnread
+                                    ? AppColors.textSecondary
+                                    : AppColors.textMuted,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          if (hasUnread) ...[
+                            const SizedBox(width: 8),
+                            _UnreadBadge(count: unread),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -201,32 +269,68 @@ class _ConversationTile extends StatelessWidget {
     final today = DateTime(now.year, now.month, now.day);
     final day = DateTime(time.year, time.month, time.day);
     if (day == today) return DateFormat.Hm().format(time);
-    if (today.difference(day).inDays == 1) return 'Yesterday';
+    final diff = today.difference(day).inDays;
+    if (diff == 1) return 'Yesterday';
+    if (diff < 7) return DateFormat('EEE').format(time);
     return DateFormat.MMMd().format(time);
   }
 }
 
-class _Avatar extends StatelessWidget {
-  const _Avatar({required this.label, this.size = 46});
+/// A small count pill (group members, etc).
+class _Pill extends StatelessWidget {
+  const _Pill({required this.icon, required this.text});
 
-  final String label;
-  final double size;
+  final IconData icon;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
-      decoration: const BoxDecoration(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.cardAlt,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: AppColors.brand700),
+          const SizedBox(width: 3),
+          Text(
+            text,
+            style: AppTypography.micro.copyWith(
+              color: AppColors.brand700,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The unread counter: a brand circle for 1–99, "99+" beyond.
+class _UnreadBadge extends StatelessWidget {
+  const _UnreadBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = count > 99 ? '99+' : '$count';
+    return Container(
+      constraints: const BoxConstraints(minWidth: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
         gradient: AppColors.primaryGradient,
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(999),
       ),
       alignment: Alignment.center,
       child: Text(
         label,
-        style: AppTypography.titleMedium.copyWith(
+        style: AppTypography.micro.copyWith(
           color: AppColors.onPrimary,
-          fontWeight: FontWeight.w700,
+          fontWeight: FontWeight.w800,
         ),
       ),
     );
@@ -298,12 +402,14 @@ class _NewChatSheet extends ConsumerWidget {
                           final person = list[i];
                           return ListTile(
                             contentPadding: EdgeInsets.zero,
-                            leading: _Avatar(
+                            leading: ChatAvatar(
                               label: person.displayName.isEmpty
                                   ? '?'
                                   : person.displayName
                                         .substring(0, 1)
                                         .toUpperCase(),
+                              isGroup: false,
+                              imageUrl: person.avatarUrl,
                               size: 40,
                             ),
                             title: Text(
@@ -342,6 +448,81 @@ class _NewChatSheet extends ConsumerWidget {
                         },
                       ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Failure state for the list: says what actually failed and offers the one
+/// thing that can help (retry), instead of a dead-end "something went wrong".
+class ChatsErrorView extends StatelessWidget {
+  const ChatsErrorView({
+    super.key,
+    required this.failure,
+    required this.onRetry,
+  });
+
+  final AppFailure failure;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final offline = failure is NetworkFailure;
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.screenX),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: AppColors.cardAlt,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(
+                offline ? Icons.wifi_off_rounded : Icons.cloud_off_rounded,
+                color: AppColors.brand600,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              offline ? 'You are offline' : "Couldn't load your chats",
+              textAlign: TextAlign.center,
+              style: AppTypography.titleMedium.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              offline
+                  ? 'Check your connection — your saved messages are still here '
+                        'inside each chat.'
+                  : 'The server did not answer properly. Try again; if it keeps '
+                        'happening, tell us what happened.',
+              textAlign: TextAlign.center,
+              style: AppTypography.caption.copyWith(height: 1.4),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              failure.userMessage,
+              textAlign: TextAlign.center,
+              style: AppTypography.micro.copyWith(color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brand600,
+                foregroundColor: AppColors.onPrimary,
+              ),
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try again'),
             ),
           ],
         ),

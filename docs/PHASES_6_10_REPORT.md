@@ -268,3 +268,73 @@ CI green on `d0ebdba`: run `43623535110` (4/4 jobs), APK `14125047760`.
 CI green on `18219d2` (**final commit, this document's text**): run `43624919801`,
 4/4 jobs — Analyze & test, Migrations & RLS, Edge Functions, Build release APK —
 APK artifact `pulse-release-apk` `14125538967`, **32.8 MB**.
+
+---
+
+## 9. Hotfix after the first real login (2026-11-14, evening)
+
+**Symptom.** Logging in and landing on Home showed the loading spinner and then
+"Something went wrong — our server side, please try again."
+
+**Root cause.** The inbox issues this query:
+
+```
+conversations?select=id,…,conversation_members(user_id,role,last_read_at,
+              profiles(id,display_name,username,avatar_url))
+```
+
+PostgREST resolves an embedded resource through a **foreign key**. Nothing
+referenced `public.profiles`: `conversation_members.user_id` and
+`messages.sender_id` pointed at `auth.users`. So every inbox load failed with
+
+```
+PGRST200  Could not find a relationship between 'conversation_members'
+          and 'profiles' in the schema cache
+```
+
+**Why the previous suites missed it.** Every test so far checked *authorisation*
+(who may read what) and *app logic* (models, state machines), but nothing checked
+the *shape* of the queries the client sends — the one layer where this bug lived.
+No device run was possible, so it surfaced to the user before it surfaced to us.
+
+**Fix** — `supabase/migrations/0008_profile_fks.sql` (applied live, PostgREST
+schema cache reloaded):
+
+- `conversation_members.user_id → public.profiles(id)` `ON DELETE CASCADE`
+- `messages.sender_id → public.profiles(id)` `ON DELETE CASCADE`
+- `conversations.created_by → public.profiles(id)` `ON DELETE SET NULL`
+
+All three are added `NOT VALID` so a stale row can never block a deploy; new rows
+are checked and the relationships are visible to PostgREST immediately.
+
+**New regression layer**
+
+- `supabase/tests/90_live_app_queries_test.py` — every PostgREST query the app
+  actually sends, run verbatim against the live project: **19/19 pass**.
+- `test/live_repository_test.dart` — the same thing through the app's own
+  `SupabaseChatRepository` (real sign-in, real rows). Verified output:
+
+```
+signed in as pulse.demo.arif@mailinator.com
+conversations returned: 2
+  [direct] Bela (@pulse) last="Force audio alert" unread=0
+  [direct] saiful (@hello) last="-" unread=0
+people available: 11
+```
+
+**UI work in the same pass**
+
+- Empty inbox: an animated, brand-coloured "No conversations yet" (three
+  breathing rings behind a floating bubble, no assets, honours
+  Settings → Reduce motion) with a Start a chat button.
+- Chat rows: profile picture (network image with an initials fallback, never a
+  broken image), name, member-count pill for groups, group badge, last-message
+  preview with a "You:" prefix and read ticks, friendly time labels
+  (time / Yesterday / weekday / date), and an unread badge capped at 99+.
+- Failure state: says what actually broke — "You are offline" vs "Couldn't load
+  your chats" — with the reason and a Try again button, instead of one generic
+  sentence.
+- `test/inbox_ui_test.dart`: **11 widget tests** for the above.
+
+Whole app after the fix: `flutter test` **153 passed, 3 skipped** (live suite
+excluded by tag), `dart analyze lib test` clean.

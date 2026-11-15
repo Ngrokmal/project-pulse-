@@ -225,7 +225,7 @@ class SupabaseChatRepository implements ChatRepository {
     try {
       final rows = await _client
           .from('profiles')
-          .select('id, display_name, username')
+          .select('id, display_name, username, avatar_url')
           .neq('id', _me)
           .order('display_name')
           .limit(100);
@@ -238,6 +238,7 @@ class SupabaseChatRepository implements ChatRepository {
                   ? r['display_name'] as String
                   : 'Pulse user',
               username: r['username'] as String?,
+              avatarUrl: r['avatar_url'] as String?,
             ),
           )
           .toList();

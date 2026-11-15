@@ -69,6 +69,7 @@ class Conversation {
     this.unreadCount = 0,
     this.kind = 'direct',
     this.title,
+    this.groupAvatarUrl,
     this.memberCount = 0,
     this.myRole,
   });
@@ -80,10 +81,14 @@ class Conversation {
   /// meaningful peer.
   final String kind;
   final String? title;
+  final String? groupAvatarUrl;
   final int memberCount;
   final GroupRole? myRole;
 
   bool get isGroup => kind == 'group';
+
+  /// The picture to show: the group's own, or the other person's.
+  String? get avatarUrl => isGroup ? groupAvatarUrl : peer.avatarUrl;
 
   /// What the list and the chat header show.
   String get displayName => isGroup
@@ -127,6 +132,7 @@ class Conversation {
       id: map['id'] as String,
       kind: (map['kind'] as String?) ?? 'direct',
       title: map['title'] as String?,
+      groupAvatarUrl: map['avatar_url'] as String?,
       memberCount: members.length,
       myRole: GroupRole.parse(mine?['role'] as String?),
       peer: other.isEmpty

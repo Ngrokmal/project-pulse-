@@ -88,9 +88,11 @@ class ChatPeerSummary {
     required this.id,
     required this.displayName,
     this.username,
+    this.avatarUrl,
   });
 
   final String id;
   final String displayName;
   final String? username;
+  final String? avatarUrl;
 }
