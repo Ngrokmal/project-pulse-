@@ -97,13 +97,15 @@ output behind it, and nothing is claimed on-device until it has run on a phone.
 | A | 行重构：62 头像 / 22 圆角 / 三层阴影 / 名字与预览墨色 | ✅ 完成 |
 | B | 入场 stagger + blur→sharp + 上下 feather（`PulseEdgeFade`） | ✅ 完成 |
 | C | 按压下沉 2.5px + 回弹 + 水波（`PulseTapSurface`） | ✅ 完成 |
-| D | 搜索 spotlight（整页后退、仅命中项上浮） | 🟡 打开/关闭/过滤/命中高亮已完成，命中项"上浮"仍为瞬移（FLIP 未做） |
-| E | 过滤 tab FLIP | ⬜ 未开始 |
+| D | 搜索 spotlight（整页后退、仅命中项上浮） | ✅ 完成：打开/关闭/过滤/命中柔光，命中行 FLIP 上浮（`PulseFlip`），左侧紫色柔光、右侧白的搜索框 |
+| E | 过滤 tab FLIP | ✅ 完成：`PulseSegments`（All/Chats/Groups，真实计数含 `0`）、胶囊弹簧滑行、4.6s sheen、计数 chip 弹跳、行 FLIP 顺序还原 |
 | F | 聊天页气泡入场 + tick 状态机（需 `lastMessageStatus` 列） | ⬜ 未开始 |
 | G | 群组页/通话页的动作套用 | ⬜ 未开始 |
 | H | 真机性能核对（`--profile`，Raster/UI 线程） | ⬜ 未开始 |
 | — | 品牌区：心跳 logo + Pulse 字标 + 搜索/通知按钮 | ✅ 完成 |
 | — | 通知面板（错峰进出） | ✅ 动效完成；**暂无数据源**，应用内显示空态 |
+
+> 注：v4 capsule 的 `box-shadow: 0 12px 28px -24px` 在 Flutter 里会把阴影矩形压成一条 sliver，Skia 将其画成一条横贯玻璃的灰带；已改为无负 spread 的极淡投影 + 顶部 1px 白色玻璃高光，观感与 v4 一致。
 
 ### 已验证（可复现）
 
