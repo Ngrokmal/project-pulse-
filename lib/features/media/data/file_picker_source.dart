@@ -10,6 +10,12 @@ import '../domain/media_asset.dart';
 class FilePickerSource {
   const FilePickerSource();
 
+  /// Photo picker (image files only).
+  Future<PickedMedia?> pickImage() => pick(type: FileType.image);
+
+  /// Any file the platform allows; the resource type is derived from the name.
+  Future<PickedMedia?> pickAny() => pick();
+
   Future<PickedMedia?> pick({
     FileType type = FileType.any,
     List<String>? allowedExtensions,

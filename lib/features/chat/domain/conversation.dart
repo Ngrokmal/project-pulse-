@@ -72,6 +72,7 @@ class Conversation {
     this.groupAvatarUrl,
     this.memberCount = 0,
     this.myRole,
+    this.peerLastReadAt,
   });
 
   final String id;
@@ -84,6 +85,10 @@ class Conversation {
   final String? groupAvatarUrl;
   final int memberCount;
   final GroupRole? myRole;
+
+  /// When the other participant last read this conversation. The only honest
+  /// source of the "seen" tick; null when unknown (groups, or no row yet).
+  final DateTime? peerLastReadAt;
 
   bool get isGroup => kind == 'group';
 
@@ -121,13 +126,18 @@ class Conversation {
   }) {
     final members = (map['conversation_members'] as List<dynamic>? ?? const [])
         .cast<Map<String, dynamic>>();
-    final other = members
+    final otherMembers = members.where((m) => m['user_id'] != myId).toList();
+    final other = otherMembers
         .map((m) => m['profiles'] as Map<String, dynamic>?)
         .whereType<Map<String, dynamic>>()
-        .where((p) => p['id'] != myId)
         .toList();
     final lastAt = map['last_message_at'] as String?;
     final mine = members.where((m) => m['user_id'] == myId).firstOrNull;
+    final peer = other.isEmpty ? null : other.first;
+    // `last_read_at` lives on the member row, not on the nested profile.
+    final peerReadRaw = otherMembers.isEmpty
+        ? null
+        : otherMembers.first['last_read_at'] as String?;
     return Conversation(
       id: map['id'] as String,
       kind: (map['kind'] as String?) ?? 'direct',
@@ -135,9 +145,12 @@ class Conversation {
       groupAvatarUrl: map['avatar_url'] as String?,
       memberCount: members.length,
       myRole: GroupRole.parse(mine?['role'] as String?),
-      peer: other.isEmpty
+      peer: peer == null
           ? const ChatPeer(id: '', displayName: 'Pulse user')
-          : ChatPeer.fromMap(other.first),
+          : ChatPeer.fromMap(peer),
+      peerLastReadAt: peerReadRaw == null
+          ? null
+          : DateTime.parse(peerReadRaw).toLocal(),
       lastMessageAt: lastAt == null ? null : DateTime.parse(lastAt).toLocal(),
       lastMessagePreview: map['last_message_preview'] as String?,
       lastMessageSenderId: map['last_message_sender'] as String?,

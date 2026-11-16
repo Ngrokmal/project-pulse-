@@ -214,6 +214,9 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
   Future<void> sendMedia({
     required PickedMedia media,
     required MessageKind kind,
+
+    /// Length of a voice note, so the receiver's bubble knows its duration.
+    int? durationMs,
   }) async {
     final current = state.value ?? const ChatThreadState(messages: []);
     final upload = ref.read(mediaUploadProvider.notifier);
@@ -230,6 +233,7 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
       createdAt: DateTime.now(),
       mediaUrl: asset.secureUrl,
       mediaBytes: asset.bytes,
+      durationMs: durationMs,
       clientId: clientId,
       delivery: DeliveryState.pending,
     );
@@ -247,6 +251,7 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
             kind: kind,
             mediaUrl: asset.secureUrl,
             mediaBytes: asset.bytes,
+            durationMs: durationMs,
           );
       _replace(optimistic.id, saved);
       ref.read(conversationsProvider.notifier).refresh();

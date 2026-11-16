@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
 import '../../features/calls/presentation/call_screen.dart';
-import '../../features/chat/presentation/chat_screen.dart';
+import '../../features/inbox/presentation/personal_inbox_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/chat/presentation/create_group_screen.dart';
 import '../../features/force_audio/presentation/force_audio_screen.dart';
@@ -49,7 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'chat',
         pageBuilder: (context, state) => _fade(
           state,
-          ChatScreen(conversationId: state.pathParameters['id']!),
+          PersonalInboxScreen(conversationId: state.pathParameters['id']!),
         ),
       ),
       GoRoute(
