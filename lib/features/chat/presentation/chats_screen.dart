@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -16,16 +18,91 @@ import '../domain/conversation.dart';
 import 'widgets/chat_avatar.dart';
 import 'widgets/empty_chats_art.dart';
 import 'widgets/pulse_list_motion.dart';
+import 'widgets/pulse_notification_sheet.dart';
+import 'widgets/pulse_search_field.dart';
 
 /// Home = the real conversation list, not a placeholder (§4 A).
-class ChatsScreen extends ConsumerWidget {
+///
+/// The chrome (brand, search, notifications) is the v4 reference: the bar folds
+/// away when search takes over, the field springs in element by element, the
+/// list behind it recedes, and the bell drops a staggered notifications sheet.
+class ChatsScreen extends ConsumerStatefulWidget {
   const ChatsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ChatsScreen> createState() => _ChatsScreenState();
+}
+
+class _ChatsScreenState extends ConsumerState<ChatsScreen>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _search = AnimationController(
+    vsync: this,
+    duration: PulseMotion.searchOpen,
+  );
+  final TextEditingController _query = TextEditingController();
+  final FocusNode _queryFocus = FocusNode();
+
+  String _needle = '';
+  bool _searchOpen = false;
+  bool _sheetOpen = false;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _query.dispose();
+    _queryFocus.dispose();
+    super.dispose();
+  }
+
+  void _openSearch() {
+    if (_searchOpen) {
+      _closeSearch();
+      return;
+    }
+    setState(() => _searchOpen = true);
+    _search.forward().then((_) {
+      if (mounted) _queryFocus.requestFocus();
+    });
+  }
+
+  void _closeSearch() {
+    _queryFocus.unfocus();
+    _query.clear();
+    setState(() {
+      _searchOpen = false;
+      _needle = '';
+    });
+    _search.reverse();
+  }
+
+  /// Hits first, everything else after — always recomputed from the full list,
+  /// so clearing the field restores the natural order exactly (§ v4 spotlight).
+  ({List<Conversation> ordered, Set<String> hits}) _filter(
+    List<Conversation> items,
+  ) {
+    final needle = _needle.trim().toLowerCase();
+    if (needle.isEmpty) return (ordered: items, hits: const <String>{});
+
+    final matched = <Conversation>[];
+    final rest = <Conversation>[];
+    for (final c in items) {
+      final haystack = '${c.displayName} ${c.lastMessagePreview ?? ''}'
+          .toLowerCase();
+      (haystack.contains(needle) ? matched : rest).add(c);
+    }
+    return (
+      ordered: <Conversation>[...matched, ...rest],
+      hits: matched.map((c) => c.id).toSet(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final conversations = ref.watch(conversationsProvider);
     final auth = ref.watch(authControllerProvider);
     final myId = auth is AuthSignedIn ? auth.user.id : '';
+
+    final typing = _needle.trim().isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -37,85 +114,136 @@ class ChatsScreen extends ConsumerWidget {
         label: const Text('New chat'),
       ),
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // The header stays put; only the list travels (as in the reference,
-            // where the title and segments never move).
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.screenX,
-                18,
-                AppSpacing.screenX,
-                12,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Messages', style: AppTypography.headlineMedium),
-                  const SizedBox(height: 2),
-                  Text('Chat · Call · Connect', style: AppTypography.caption),
-                ],
-              ),
-            ),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: () =>
-                    ref.read(conversationsProvider.notifier).refresh(),
-                child: PulseEdgeFade(
-                  child: CustomScrollView(
-                    slivers: [
-                      conversations.when(
-                        loading: () => const SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: PulseLoading(message: 'Loading your chats'),
-                        ),
-                        error: (error, _) => SliverFillRemaining(
-                          hasScrollBody: false,
-                          child: ChatsErrorView(
-                            failure: error is AppFailure
-                                ? error
-                                : const ServerFailure(),
-                            onRetry: () => ref
-                                .read(conversationsProvider.notifier)
-                                .refresh(),
+            Column(
+              children: [
+                PulseAppBar(
+                  t: _search,
+                  onSearch: _openSearch,
+                  onBell: () => setState(() => _sheetOpen = true),
+                ),
+                PulseSearchField(
+                  t: _search,
+                  controller: _query,
+                  focusNode: _queryFocus,
+                  onChanged: (value) => setState(() => _needle = value),
+                  onClose: _closeSearch,
+                ),
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: _search,
+                    builder: (context, child) {
+                      // While searching the list recedes — until you actually
+                      // type, when it comes back so the hits can be read.
+                      final k = typing ? 0.0 : _search.value;
+                      Widget view = child!;
+                      if (k > 0.001) {
+                        view = ImageFiltered(
+                          imageFilter: ImageFilter.blur(
+                            sigmaX: 0.8 * k,
+                            sigmaY: 0.8 * k,
                           ),
+                          child: view,
+                        );
+                      }
+                      return Opacity(
+                        opacity: 1 - 0.58 * k,
+                        child: Transform.scale(
+                          scale: 1 - 0.018 * k,
+                          child: view,
                         ),
-                        data: (items) {
-                          if (items.isEmpty) {
-                            return SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: Center(
-                                child: EmptyChatsArt(
-                                  onStartChat: () =>
-                                      _openNewChatSheet(context, ref),
+                      );
+                    },
+                    child: RefreshIndicator(
+                      onRefresh: () =>
+                          ref.read(conversationsProvider.notifier).refresh(),
+                      child: PulseEdgeFade(
+                        child: CustomScrollView(
+                          slivers: [
+                            conversations.when(
+                              loading: () => const SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: PulseLoading(
+                                  message: 'Loading your chats',
                                 ),
                               ),
-                            );
-                          }
-                          return SliverList.separated(
-                            itemCount: items.length,
-                            separatorBuilder: (_, _) =>
-                                const SizedBox(height: PulseMotion.rowGap),
-                            itemBuilder: (context, i) => Padding(
-                              padding: EdgeInsets.fromLTRB(
-                                AppSpacing.screenX,
-                                i == 0 ? PulseMotion.featherTop : 0,
-                                AppSpacing.screenX,
-                                i == items.length - 1 ? 90 : 0,
+                              error: (error, _) => SliverFillRemaining(
+                                hasScrollBody: false,
+                                child: ChatsErrorView(
+                                  failure: error is AppFailure
+                                      ? error
+                                      : const ServerFailure(),
+                                  onRetry: () => ref
+                                      .read(conversationsProvider.notifier)
+                                      .refresh(),
+                                ),
                               ),
-                              child: ConversationTile(
-                                conversation: items[i],
-                                myId: myId,
-                                index: i,
-                              ),
+                              data: (items) {
+                                if (items.isEmpty) {
+                                  return SliverFillRemaining(
+                                    hasScrollBody: false,
+                                    child: Center(
+                                      child: EmptyChatsArt(
+                                        onStartChat: () =>
+                                            _openNewChatSheet(context, ref),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                final filtered = _filter(items);
+                                final hero = filtered.hits.isEmpty
+                                    ? null
+                                    : (filtered.hits.contains(
+                                            filtered.ordered.first.id,
+                                          )
+                                          ? filtered.ordered.first.id
+                                          : null);
+
+                                return SliverList.separated(
+                                  itemCount: filtered.ordered.length,
+                                  separatorBuilder: (_, _) => const SizedBox(
+                                    height: PulseMotion.rowGap,
+                                  ),
+                                  itemBuilder: (context, i) {
+                                    final c = filtered.ordered[i];
+                                    return Padding(
+                                      padding: EdgeInsets.fromLTRB(
+                                        AppSpacing.screenX,
+                                        i == 0 ? PulseMotion.featherTop : 0,
+                                        AppSpacing.screenX,
+                                        i == filtered.ordered.length - 1
+                                            ? 90
+                                            : 0,
+                                      ),
+                                      child: ConversationTile(
+                                        key: ValueKey<String>(c.id),
+                                        conversation: c,
+                                        myId: myId,
+                                        index: i,
+                                        dimmed:
+                                            typing &&
+                                            !filtered.hits.contains(c.id),
+                                        highlighted: typing && c.id == hero,
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
                             ),
-                          );
-                        },
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
+            ),
+            PulseNotificationSheet(
+              open: _sheetOpen,
+              notices: const <PulseNoticeData>[],
+              onClose: () => setState(() => _sheetOpen = false),
             ),
           ],
         ),
@@ -151,6 +279,8 @@ class ConversationTile extends StatelessWidget {
     required this.conversation,
     required this.myId,
     this.index = 0,
+    this.dimmed = false,
+    this.highlighted = false,
   });
 
   final Conversation conversation;
@@ -158,6 +288,12 @@ class ConversationTile extends StatelessWidget {
 
   /// Position in the list — drives the 26 ms entrance stagger.
   final int index;
+
+  /// Not a search hit: the row recedes (blur 2.2 px, 42 % opacity).
+  final bool dimmed;
+
+  /// The first hit: lifted onto a brand-tinted shadow with a thin purple ring.
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -183,7 +319,7 @@ class ConversationTile extends StatelessWidget {
     final showTicks = mineLast && hasPreview;
     final spokenLine = showTicks ? 'You: $line' : line;
 
-    return PulseRowMotion(
+    Widget body = PulseRowMotion(
       index: index,
       seenKey: c.id,
       child: PulseTapSurface(
@@ -195,7 +331,15 @@ class ConversationTile extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: PulseMotion.rowSurface,
             borderRadius: BorderRadius.circular(PulseMotion.rowRadius),
-            boxShadow: PulseMotion.rowShadow,
+            boxShadow: highlighted
+                ? PulseMotion.rowHeroShadow
+                : PulseMotion.rowShadow,
+            border: highlighted
+                ? Border.all(
+                    color: const Color(0xFF7B5FED).withValues(alpha: 0.42),
+                    width: 1.6,
+                  )
+                : null,
           ),
           padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
           child: Row(
@@ -215,7 +359,9 @@ class ConversationTile extends StatelessWidget {
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: AppTypography.titleMedium.copyWith(
-                              color: PulseMotion.nameInk,
+                              color: highlighted
+                                  ? const Color(0xFF4F25C4)
+                                  : PulseMotion.nameInk,
                               fontWeight: hasUnread
                                   ? FontWeight.w700
                                   : FontWeight.w700,
@@ -299,6 +445,19 @@ class ConversationTile extends StatelessWidget {
         ),
       ),
     );
+
+    if (!dimmed) return body;
+    body = Opacity(
+      opacity: PulseMotion.excludedOpacity,
+      child: ImageFiltered(
+        imageFilter: ImageFilter.blur(
+          sigmaX: PulseMotion.excludedBlur / 2,
+          sigmaY: PulseMotion.excludedBlur / 2,
+        ),
+        child: body,
+      ),
+    );
+    return IgnorePointer(child: body);
   }
 
   static String _formatTime(DateTime time) {

@@ -62,3 +62,4 @@ android/key.properties
 
 # visual QA frames (regenerate: flutter test test/qa/preview_frames_test.dart --run-skipped --update-goldens)
 /test/qa/frames/
+/test/qa/failures/

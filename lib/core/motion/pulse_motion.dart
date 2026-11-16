@@ -54,6 +54,38 @@ class PulseMotion {
   static const double unreadDot = 22;
 
   /// Ripple base diameter (CSS `width: 22px`).
+  // ---------------------------------------------------------------- brand
+  /// The logo breathes on a 2.6 s cycle: four still beats, then a small
+  /// double-thump around 78–90 %.
+  static const Duration logoBeat = Duration(milliseconds: 2600);
+
+  /// The two rings leaving the logo tile (the second is offset by half).
+  static const Duration logoRing = Duration(milliseconds: 3000);
+
+  /// The ECG line drawing itself, plus the spark that rides it.
+  static const Duration waveDraw = Duration(milliseconds: 3100);
+
+  /// The bell sits still for 86 % of seven seconds, then shakes once.
+  static const Duration bellWiggle = Duration(milliseconds: 7000);
+
+  static const Duration badgePop = Duration(milliseconds: 500);
+  static const Duration badgeDelay = Duration(milliseconds: 350);
+
+  // ---------------------------------------------------------- notifications
+  static const Duration sheetIn = Duration(milliseconds: 460);
+  static const Duration noticeIn = Duration(milliseconds: 580);
+  static const Duration noticeInDelay = Duration(milliseconds: 140);
+  static const Duration noticeStagger = Duration(milliseconds: 90);
+  static const Duration noticeOut = Duration(milliseconds: 340);
+  static const Duration noticeOutStagger = Duration(milliseconds: 55);
+
+  // --------------------------------------------------------------- search
+  /// Non-matching rows while a query is typed.
+  static const double excludedOpacity = 0.42;
+  static const double excludedBlur = 2.2;
+
+  static const Color wordmarkInk = Color(0xFF141452);
+
   /// How far content dissolves at the top / bottom edge of a scrolling list.
   static const double featherTop = 26;
   static const double featherBottom = 42;
@@ -112,4 +144,16 @@ class PulseMotion {
     end: Alignment.bottomCenter,
     colors: [Color(0xF0FFFFFF), Color(0xA8FFFFFF)],
   );
+
+  /// The first search hit lifts onto a brand-tinted shadow with a 1.6 px ring.
+  static const List<BoxShadow> rowHeroShadow = [
+    BoxShadow(
+      color: Color(0x9E5F3FDC),
+      offset: Offset(0, 20),
+      blurRadius: 38,
+      spreadRadius: -18,
+    ),
+    BoxShadow(color: Color(0x6B7B5FED), spreadRadius: 1.6),
+    BoxShadow(color: Color(0x0D151418), offset: Offset(0, 3), blurRadius: 10),
+  ];
 }
