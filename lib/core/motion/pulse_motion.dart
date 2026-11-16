@@ -86,6 +86,16 @@ class PulseMotion {
 
   static const Color wordmarkInk = Color(0xFF141452);
 
+  // The segmented control's pill uses the brand gradient, exactly like
+  // `--grad: linear-gradient(135deg, #9B8AF5 0%, #5F3FDC 55%, #4F25C4 100%)`.
+  static const Color segmentPillStart = Color(0xFF9B8AF5);
+  static const Color segmentPillMid = Color(0xFF5F3FDC);
+  static const Color segmentPillEnd = Color(0xFF4F25C4);
+
+  /// Rows that survive a tab switch glide to their new place instead of jumping:
+  /// translateY(old → 0), scale .987 → 1, blur 2.6 → 0 (sharp by 60 %).
+  static const Duration rowShiftMs = Duration(milliseconds: 560);
+
   /// How far content dissolves at the top / bottom edge of a scrolling list.
   static const double featherTop = 26;
   static const double featherBottom = 42;

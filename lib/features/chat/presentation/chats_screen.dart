@@ -20,6 +20,7 @@ import 'widgets/empty_chats_art.dart';
 import 'widgets/pulse_list_motion.dart';
 import 'widgets/pulse_notification_sheet.dart';
 import 'widgets/pulse_search_field.dart';
+import 'widgets/pulse_segments.dart';
 
 /// Home = the real conversation list, not a placeholder (§4 A).
 ///
@@ -43,6 +44,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
   final FocusNode _queryFocus = FocusNode();
 
   String _needle = '';
+  InboxFilter _filter = InboxFilter.all;
   bool _searchOpen = false;
   bool _sheetOpen = false;
 
@@ -52,6 +54,18 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
     _query.dispose();
     _queryFocus.dispose();
     super.dispose();
+  }
+
+  void _selectTab(InboxFilter next) {
+    if (next == _filter) return;
+    _query.clear();
+    _queryFocus.unfocus();
+    setState(() {
+      _filter = next;
+      _needle = '';
+      _searchOpen = false;
+    });
+    _search.reverse();
   }
 
   void _openSearch() {
@@ -77,15 +91,16 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
 
   /// Hits first, everything else after — always recomputed from the full list,
   /// so clearing the field restores the natural order exactly (§ v4 spotlight).
-  ({List<Conversation> ordered, Set<String> hits}) _filter(
+  ({List<Conversation> ordered, Set<String> hits}) _apply(
     List<Conversation> items,
   ) {
+    final inTab = items.where((c) => _filter.accepts(c.kind)).toList();
     final needle = _needle.trim().toLowerCase();
-    if (needle.isEmpty) return (ordered: items, hits: const <String>{});
+    if (needle.isEmpty) return (ordered: inTab, hits: const <String>{});
 
     final matched = <Conversation>[];
     final rest = <Conversation>[];
-    for (final c in items) {
+    for (final c in inTab) {
       final haystack = '${c.displayName} ${c.lastMessagePreview ?? ''}'
           .toLowerCase();
       (haystack.contains(needle) ? matched : rest).add(c);
@@ -103,6 +118,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
     final myId = auth is AuthSignedIn ? auth.user.id : '';
 
     final typing = _needle.trim().isNotEmpty;
+    final allItems = conversations.asData?.value ?? const <Conversation>[];
 
     return Scaffold(
       backgroundColor: AppColors.bg,
@@ -129,6 +145,23 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
                   focusNode: _queryFocus,
                   onChanged: (value) => setState(() => _needle = value),
                   onClose: _closeSearch,
+                ),
+                IgnorePointer(
+                  ignoring: _searchOpen,
+                  child: Opacity(
+                    opacity: _searchOpen ? 0.45 : 1,
+                    child: PulseSegments(
+                      selected: _filter,
+                      allCount: allItems.length,
+                      chatCount: allItems
+                          .where((c) => c.kind != 'group')
+                          .length,
+                      groupCount: allItems
+                          .where((c) => c.kind == 'group')
+                          .length,
+                      onChanged: _selectTab,
+                    ),
+                  ),
                 ),
                 Expanded(
                   child: AnimatedBuilder(
@@ -192,7 +225,7 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
                                   );
                                 }
 
-                                final filtered = _filter(items);
+                                final filtered = _apply(items);
                                 final hero = filtered.hits.isEmpty
                                     ? null
                                     : (filtered.hits.contains(
@@ -334,12 +367,6 @@ class ConversationTile extends StatelessWidget {
             boxShadow: highlighted
                 ? PulseMotion.rowHeroShadow
                 : PulseMotion.rowShadow,
-            border: highlighted
-                ? Border.all(
-                    color: const Color(0xFF7B5FED).withValues(alpha: 0.42),
-                    width: 1.6,
-                  )
-                : null,
           ),
           padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
           child: Row(

@@ -160,3 +160,102 @@ class PulseEdgeFade extends StatelessWidget {
     );
   }
 }
+
+/// Keeps a row's identity while the list around it reorders (tab switch, search
+/// spotlight) and glides it from where it used to be to where it now belongs.
+///
+/// The reference does this with `getBoundingClientRect()` before and after the
+/// mutation (`rowShift`: translateY → 0, scale .987 → 1, blur 2.6 → 0 over
+/// 560 ms on the spring). The equivalent here measures in *content* space — the
+/// row's top plus the scroll offset — so a concurrent scroll cannot fake a move.
+class PulseFlip extends StatefulWidget {
+  const PulseFlip({super.key, required this.id, required this.child});
+
+  final String id;
+  final Widget child;
+
+  @override
+  State<PulseFlip> createState() => _PulseFlipState();
+}
+
+class _PulseFlipState extends State<PulseFlip>
+    with SingleTickerProviderStateMixin {
+  /// Where each row sat last time we looked, in content coordinates.
+  static final Map<String, double> _tops = <String, double>{};
+
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: PulseMotion.rowShiftMs,
+  );
+  double _shift = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(PulseFlip old) {
+    super.didUpdateWidget(old);
+    _schedule();
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _schedule() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final box = context.findRenderObject() as RenderBox?;
+      if (box == null || !box.hasSize) return;
+
+      final scroll = Scrollable.maybeOf(context)?.position.pixels ?? 0;
+      final top = box.localToGlobal(Offset.zero).dy + scroll;
+      final previous = _tops[widget.id];
+      _tops[widget.id] = top;
+
+      if (previous == null) return; // first appearance: the entrance owns it
+      final dy = previous - top;
+      // Anything larger than a few rows is a stale measurement from a row that
+      // was culled off-screen, not a glide.
+      if (dy.abs() < 1.5 || dy.abs() > 420) return;
+
+      _shift = dy;
+      _c.forward(from: 0);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      builder: (context, child) {
+        final v = _c.value;
+        if (v >= 1 || _shift == 0) return child!;
+
+        final eased = PulseMotion.spring.transform(v);
+        final dy = _shift * (1 - eased);
+        final scale = 0.987 + 0.013 * eased;
+        final sigma =
+            PulseMotion.blur(2.6 * (1 - (v / 0.6).clamp(0.0, 1.0))) / 2;
+
+        Widget content = Transform.translate(
+          offset: Offset(0, dy),
+          child: Transform.scale(scale: scale, child: child),
+        );
+        if (sigma > 0.05) {
+          content = ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+            child: content,
+          );
+        }
+        return content;
+      },
+      child: widget.child,
+    );
+  }
+}

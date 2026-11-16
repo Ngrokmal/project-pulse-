@@ -1,3 +1,4 @@
+import 'dart:ui' as ui show Gradient;
 import 'dart:ui' show ImageFilter;
 
 import 'package:material_ui/material_ui.dart';
@@ -93,21 +94,11 @@ class PulseSearchField extends StatelessWidget {
                               child: IgnorePointer(
                                 child: Opacity(
                                   opacity: open,
-                                  child: DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(18),
-                                      gradient: RadialGradient(
-                                        center: const Alignment(-0.84, 0),
-                                        radius: 1.55,
-                                        colors: [
-                                          AppColors.brand500.withValues(
-                                            alpha: 0.20,
-                                          ),
-                                          AppColors.brand500.withValues(
-                                            alpha: 0.0,
-                                          ),
-                                        ],
-                                        stops: const [0, 0.6],
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: CustomPaint(
+                                      painter: _BloomPainter(
+                                        color: AppColors.brand500,
                                       ),
                                     ),
                                   ),
@@ -140,7 +131,14 @@ class PulseSearchField extends StatelessWidget {
                                       cursorColor: AppColors.brand600,
                                       decoration: const InputDecoration(
                                         isDense: true,
+                                        filled: false,
                                         border: InputBorder.none,
+                                        enabledBorder: InputBorder.none,
+                                        focusedBorder: InputBorder.none,
+                                        disabledBorder: InputBorder.none,
+                                        errorBorder: InputBorder.none,
+                                        focusedErrorBorder: InputBorder.none,
+                                        contentPadding: EdgeInsets.zero,
                                         hintText: 'Search messages or people',
                                         hintStyle: TextStyle(
                                           fontSize: 14.5,
@@ -310,4 +308,44 @@ class PulseAppBar extends StatelessWidget {
       child: child,
     );
   }
+}
+
+/// `radial-gradient(150% 200% at 8% 50%, rgba(123,95,237,.20), rgba(123,95,237,0) 60%)`
+///
+/// Drawn by hand because Flutter's [RadialGradient] is circular unless you hand
+/// it a transform — and the whole point of the reference's bloom is that it is a
+/// wide ellipse hugging the left edge, so the field reads lavender on the left
+/// and white on the right.
+class _BloomPainter extends CustomPainter {
+  _BloomPainter({required this.color});
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+
+    final rx = size.width * 1.5;
+    final ry = size.height * 2.0;
+
+    // A radial gradient with equal radii, stretched into the ellipse.
+    final matrix = Matrix4.identity()
+      ..translateByDouble(size.width * 0.08, size.height * 0.5, 0, 1)
+      ..scaleByDouble(1.0, ry / rx, 1.0, 1.0)
+      ..translateByDouble(-size.width * 0.08, -size.height * 0.5, 0, 1);
+
+    final shader = ui.Gradient.radial(
+      Offset(size.width * 0.08, size.height * 0.5),
+      rx,
+      [color.withValues(alpha: 0.20), color.withValues(alpha: 0.0)],
+      const [0.0, 0.6],
+      TileMode.clamp,
+      matrix.storage,
+    );
+
+    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
+  }
+
+  @override
+  bool shouldRepaint(_BloomPainter old) => old.color != color;
 }

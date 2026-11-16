@@ -23,6 +23,7 @@ import 'package:pulse/core/motion/pulse_icons.dart';
 import 'package:pulse/features/chat/presentation/chats_screen.dart';
 import 'package:pulse/features/chat/presentation/widgets/pulse_notification_sheet.dart';
 import 'package:pulse/features/chat/presentation/widgets/pulse_search_field.dart';
+import 'package:pulse/features/chat/presentation/widgets/pulse_segments.dart';
 import 'package:pulse/features/chat/presentation/widgets/pulse_list_motion.dart';
 
 final GlobalKey _rootKey = GlobalKey();
@@ -172,6 +173,7 @@ class _HarnessState extends State<_Harness>
   final FocusNode _focus = FocusNode();
 
   String _needle = '';
+  InboxFilter _filter = InboxFilter.all;
   bool _sheet = false;
 
   @override
@@ -186,6 +188,16 @@ class _HarnessState extends State<_Harness>
     _search.forward();
   }
 
+  /// Switching tabs closes the search and drops the query, exactly like the app.
+  void selectTab(InboxFilter f) {
+    _query.clear();
+    setState(() {
+      _filter = f;
+      _needle = '';
+    });
+    _search.reverse();
+  }
+
   void type(String q) => setState(() {
     _needle = q;
     _query.text = q;
@@ -196,14 +208,15 @@ class _HarnessState extends State<_Harness>
   @override
   Widget build(BuildContext context) {
     final typing = _needle.trim().isNotEmpty;
+    final inTab = _items.where((c) => _filter.accepts(c.kind)).toList();
     final matched = <Conversation>[];
     final rest = <Conversation>[];
-    for (final c in _items) {
+    for (final c in inTab) {
       final hay = '${c.displayName} ${c.lastMessagePreview ?? ''}'
           .toLowerCase();
       (hay.contains(_needle.trim().toLowerCase()) ? matched : rest).add(c);
     }
-    final ordered = typing ? <Conversation>[...matched, ...rest] : _items;
+    final ordered = typing ? <Conversation>[...matched, ...rest] : inTab;
     final hits = matched.map((c) => c.id).toSet();
     final hero = typing && matched.isNotEmpty ? matched.first.id : null;
 
@@ -234,6 +247,20 @@ class _HarnessState extends State<_Harness>
                       focusNode: _focus,
                       onChanged: type,
                       onClose: () {},
+                    ),
+                    IgnorePointer(
+                      ignoring: false,
+                      child: PulseSegments(
+                        selected: _filter,
+                        allCount: _items.length,
+                        chatCount: _items
+                            .where((c) => c.kind != 'group')
+                            .length,
+                        groupCount: _items
+                            .where((c) => c.kind == 'group')
+                            .length,
+                        onChanged: selectTab,
+                      ),
                     ),
                     Expanded(
                       child: AnimatedBuilder(
@@ -275,13 +302,17 @@ class _HarnessState extends State<_Harness>
                                       AppSpacing.screenX,
                                       0,
                                     ),
-                                    child: ConversationTile(
-                                      key: ValueKey<String>(c.id),
-                                      conversation: c,
-                                      myId: 'me',
-                                      index: i,
-                                      dimmed: typing && !hits.contains(c.id),
-                                      highlighted: typing && c.id == hero,
+                                    child: PulseFlip(
+                                      key: ValueKey<String>('flip-${c.id}'),
+                                      id: c.id,
+                                      child: ConversationTile(
+                                        key: ValueKey<String>(c.id),
+                                        conversation: c,
+                                        myId: 'me',
+                                        index: i,
+                                        dimmed: typing && !hits.contains(c.id),
+                                        highlighted: typing && c.id == hero,
+                                      ),
                                     ),
                                   );
                                 },
@@ -389,6 +420,25 @@ void main() {
 
     _harnessState.type('');
     await tester.pump(const Duration(milliseconds: 300));
+
+    // tab switch: the pill glides, surviving rows glide too. The first pump
+    // after a setState only *starts* the implicit animations, so every tab
+    // switch needs one bare pump before the clock is allowed to run.
+    _harnessState.selectTab(InboxFilter.chats);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 260));
+    await _shot('12-tab-chats-140ms');
+    await tester.pump(const Duration(milliseconds: 900));
+    await _shot('13-tab-chats');
+
+    _harnessState.selectTab(InboxFilter.groups);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
+    await _shot('14-tab-groups');
+
+    _harnessState.selectTab(InboxFilter.all);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 700));
 
     // notifications sheet: staggered arrival
     _harnessState.openSheet();
