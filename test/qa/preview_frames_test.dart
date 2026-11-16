@@ -217,6 +217,10 @@ class _HarnessState extends State<_Harness>
       (hay.contains(_needle.trim().toLowerCase()) ? matched : rest).add(c);
     }
     final ordered = typing ? <Conversation>[...matched, ...rest] : inTab;
+
+    // same bookkeeping as the screen: whatever was not on screen a moment ago
+    // plays the staggered entrance
+    PulseListReflow.instance.noteVisible(ordered.map((c) => c.id));
     final hits = matched.map((c) => c.id).toSet();
     final hero = typing && matched.isNotEmpty ? matched.first.id : null;
 
@@ -302,17 +306,16 @@ class _HarnessState extends State<_Harness>
                                       AppSpacing.screenX,
                                       0,
                                     ),
-                                    child: PulseFlip(
-                                      key: ValueKey<String>('flip-${c.id}'),
-                                      id: c.id,
-                                      child: ConversationTile(
-                                        key: ValueKey<String>(c.id),
-                                        conversation: c,
-                                        myId: 'me',
-                                        index: i,
-                                        dimmed: typing && !hits.contains(c.id),
-                                        highlighted: typing && c.id == hero,
-                                      ),
+                                    child: ConversationTile(
+                                      key: ValueKey<String>(c.id),
+                                      conversation: c,
+                                      myId: 'me',
+                                      index: i,
+                                      // the tile owns its own glide/entrance now
+                                      fresh: PulseListReflow.instance
+                                          .isAppearing(c.id),
+                                      dimmed: typing && !hits.contains(c.id),
+                                      highlighted: typing && c.id == hero,
                                     ),
                                   );
                                 },

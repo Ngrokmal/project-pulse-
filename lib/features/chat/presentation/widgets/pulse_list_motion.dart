@@ -4,6 +4,56 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/motion/pulse_motion.dart';
 
+/// The reference's `reflow()` bookkeeping: it remembers which rows were on
+/// screen *before* a tab or query change, so it can tell the three cases apart.
+///
+/// * a row that was already on screen and moved → it glides (`rowShift`)
+/// * a row that was filtered away and comes back → it plays the staggered
+///   entrance again (`rowEnter`, index × 26 ms)
+/// * a row that leaves → it is simply gone, no exit animation
+///
+/// Flutter recycles elements, so the "was it here?" question cannot be answered
+/// from the widget lifecycle alone — the list feeds the visible ids in on every
+/// build and this keeps the previous set.
+class PulseListReflow {
+  PulseListReflow._();
+
+  static final PulseListReflow instance = PulseListReflow._();
+
+  Set<String> _last = <String>{};
+  Set<String> _appearing = <String>{};
+  bool _settleScheduled = false;
+
+  /// Call from the list build with the ids that are on screen now. Returns the
+  /// rows that just appeared.
+  Set<String> noteVisible(Iterable<String> ids) {
+    final now = ids.toSet();
+    _appearing = now.difference(_last);
+    _last = now;
+
+    // Only the frame that follows the reflow may claim the entrance; a row that
+    // scrolls in a second later is arriving, not making an entrance.
+    if (_appearing.isNotEmpty && !_settleScheduled) {
+      _settleScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _appearing = <String>{};
+        _settleScheduled = false;
+      });
+    }
+    return _appearing;
+  }
+
+  /// True while the row named [id] is the one that just appeared.
+  bool isAppearing(String id) => _appearing.contains(id);
+
+  /// Test hook: forget everything.
+  @visibleForTesting
+  void reset() {
+    _last = <String>{};
+    _appearing = <String>{};
+  }
+}
+
 /// One row of a Pulse list: the staggered entrance (blur → sharp, rise →
 /// settle) from the reference.
 ///
@@ -16,6 +66,7 @@ class PulseRowMotion extends StatefulWidget {
     required this.index,
     required this.child,
     this.seenKey,
+    this.fresh = false,
   });
 
   /// Position in the list; drives the 26 ms stagger.
@@ -28,6 +79,10 @@ class PulseRowMotion extends StatefulWidget {
   /// recycle elements while scrolling, so without this a row that scrolls into
   /// view would replay the whole blur-in — which reads as a glitch, not motion.
   final String? seenKey;
+
+  /// This row just came back into the list (a tab switch revealed it): the
+  /// reference replays the full entrance for it, stagger delay included.
+  final bool fresh;
 
   @override
   State<PulseRowMotion> createState() => _PulseRowMotionState();
@@ -55,7 +110,10 @@ class _PulseRowMotionState extends State<PulseRowMotion>
     final alreadyScrolled = position != null && position.pixels > 0.5;
     final key = widget.seenKey;
 
-    if (alreadyScrolled || (key != null && !_seen.add(key))) {
+    final replay =
+        widget.fresh ||
+        (key != null && PulseListReflow.instance.isAppearing(key));
+    if (alreadyScrolled || (key != null && !replay && !_seen.add(key))) {
       _enterT = const AlwaysStoppedAnimation<double>(1);
       return;
     }
@@ -91,7 +149,10 @@ class _PulseRowMotionState extends State<PulseRowMotion>
 
         final dy = out * PulseMotion.rowEnterRise;
         final scale = 1 - (1 - PulseMotion.rowEnterScale) * out;
-        final sigma = PulseMotion.blur(out * 7) / 2;
+        // rowEnter: `55%{filter:blur(0)}` — the blur is gone well before the
+        // transform settles.
+        final sigma =
+            PulseMotion.blur(7 * (1 - (t / 0.55).clamp(0.0, 1.0))) / 2;
 
         Widget content = Transform.translate(
           offset: Offset(0, dy),
@@ -169,10 +230,20 @@ class PulseEdgeFade extends StatelessWidget {
 /// 560 ms on the spring). The equivalent here measures in *content* space — the
 /// row's top plus the scroll offset — so a concurrent scroll cannot fake a move.
 class PulseFlip extends StatefulWidget {
-  const PulseFlip({super.key, required this.id, required this.child});
+  const PulseFlip({
+    super.key,
+    required this.id,
+    required this.child,
+    this.skip = false,
+  });
 
   final String id;
   final Widget child;
+
+  /// The row is appearing (or being rebuilt for the first time): record where it
+  /// is, but let the entrance own this frame instead of gliding from a stale
+  /// position.
+  final bool skip;
 
   @override
   State<PulseFlip> createState() => _PulseFlipState();
@@ -219,6 +290,7 @@ class _PulseFlipState extends State<PulseFlip>
       _tops[widget.id] = top;
 
       if (previous == null) return; // first appearance: the entrance owns it
+      if (widget.skip) return; // re-entering the list: the entrance owns it too
       final dy = previous - top;
       // Anything larger than a few rows is a stale measurement from a row that
       // was culled off-screen, not a glide.

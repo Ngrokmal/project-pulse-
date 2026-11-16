@@ -226,6 +226,11 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
                                 }
 
                                 final filtered = _apply(items);
+                                // Tell the rows what is on screen now: whatever
+                                // was not there a moment ago makes an entrance.
+                                PulseListReflow.instance.noteVisible(
+                                  filtered.ordered.map((c) => c.id),
+                                );
                                 final hero = filtered.hits.isEmpty
                                     ? null
                                     : (filtered.hits.contains(
@@ -255,6 +260,8 @@ class _ChatsScreenState extends ConsumerState<ChatsScreen>
                                         conversation: c,
                                         myId: myId,
                                         index: i,
+                                        fresh: PulseListReflow.instance
+                                            .isAppearing(c.id),
                                         dimmed:
                                             typing &&
                                             !filtered.hits.contains(c.id),
@@ -314,6 +321,7 @@ class ConversationTile extends StatelessWidget {
     this.index = 0,
     this.dimmed = false,
     this.highlighted = false,
+    this.fresh = false,
   });
 
   final Conversation conversation;
@@ -327,6 +335,10 @@ class ConversationTile extends StatelessWidget {
 
   /// The first hit: lifted onto a brand-tinted shadow with a thin purple ring.
   final bool highlighted;
+
+  /// This row was not on screen before the last tab/query change, so it plays
+  /// the full entrance instead of gliding into place.
+  final bool fresh;
 
   @override
   Widget build(BuildContext context) {
@@ -352,122 +364,131 @@ class ConversationTile extends StatelessWidget {
     final showTicks = mineLast && hasPreview;
     final spokenLine = showTicks ? 'You: $line' : line;
 
-    Widget body = PulseRowMotion(
-      index: index,
-      seenKey: c.id,
-      child: PulseTapSurface(
-        onTap: () => context.push('/chat/${c.id}'),
-        semanticsLabel:
-            '${c.displayName}, '
-            '${hasUnread ? '$unread unread, ' : ''}$spokenLine',
-        child: Container(
-          decoration: BoxDecoration(
-            gradient: PulseMotion.rowSurface,
-            borderRadius: BorderRadius.circular(PulseMotion.rowRadius),
-            boxShadow: highlighted
-                ? PulseMotion.rowHeroShadow
-                : PulseMotion.rowShadow,
-          ),
-          padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
-          child: Row(
-            children: [
-              _Avatar(c: c),
-              const SizedBox(width: 13),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            c.displayName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.titleMedium.copyWith(
-                              color: highlighted
-                                  ? const Color(0xFF4F25C4)
-                                  : PulseMotion.nameInk,
-                              fontWeight: hasUnread
-                                  ? FontWeight.w700
-                                  : FontWeight.w700,
+    // The row is the reference's `.row`: one element that either glides from
+    // where it used to be (`rowShift`) or plays the staggered entrance
+    // (`rowEnter`). `fresh` says it just came back into the list, so the
+    // entrance owns the frame and the glide stands down.
+    Widget body = PulseFlip(
+      id: c.id,
+      skip: fresh,
+      child: PulseRowMotion(
+        index: index,
+        seenKey: c.id,
+        fresh: fresh,
+        child: PulseTapSurface(
+          onTap: () => context.push('/chat/${c.id}'),
+          semanticsLabel:
+              '${c.displayName}, '
+              '${hasUnread ? '$unread unread, ' : ''}$spokenLine',
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: PulseMotion.rowSurface,
+              borderRadius: BorderRadius.circular(PulseMotion.rowRadius),
+              boxShadow: highlighted
+                  ? PulseMotion.rowHeroShadow
+                  : PulseMotion.rowShadow,
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+            child: Row(
+              children: [
+                _Avatar(c: c),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              c.displayName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.titleMedium.copyWith(
+                                color: highlighted
+                                    ? const Color(0xFF4F25C4)
+                                    : PulseMotion.nameInk,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w700,
+                              ),
                             ),
                           ),
-                        ),
-                        if (c.isGroup && c.memberCount > 0) ...[
-                          const SizedBox(width: 6),
-                          _Pill(
-                            icon: Icons.groups_rounded,
-                            text: '${c.memberCount}',
-                          ),
+                          if (c.isGroup && c.memberCount > 0) ...[
+                            const SizedBox(width: 6),
+                            _Pill(
+                              icon: Icons.groups_rounded,
+                              text: '${c.memberCount}',
+                            ),
+                          ],
+                          const Spacer(),
+                          if (time != null)
+                            Text(
+                              _formatTime(time),
+                              style: AppTypography.caption.copyWith(
+                                color: hasUnread
+                                    ? AppColors.brand600
+                                    : AppColors.textMuted,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                              ),
+                            ),
                         ],
-                        const Spacer(),
-                        if (time != null)
-                          Text(
-                            _formatTime(time),
-                            style: AppTypography.caption.copyWith(
-                              color: hasUnread
-                                  ? AppColors.brand600
-                                  : AppColors.textMuted,
-                              fontWeight: hasUnread
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text.rich(
-                            TextSpan(
-                              children: [
-                                if (showTicks)
-                                  const TextSpan(
-                                    text: 'You: ',
-                                    style: TextStyle(
-                                      color: AppColors.brand600,
-                                      fontWeight: FontWeight.w700,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  if (showTicks)
+                                    const TextSpan(
+                                      text: 'You: ',
+                                      style: TextStyle(
+                                        color: AppColors.brand600,
+                                        fontWeight: FontWeight.w700,
+                                      ),
                                     ),
-                                  ),
-                                TextSpan(text: line),
-                              ],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.caption.copyWith(
-                              color: hasUnread
-                                  ? AppColors.textSecondary
-                                  : PulseMotion.previewInk,
-                              fontWeight: hasUnread
-                                  ? FontWeight.w600
-                                  : FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                        // The ticks never get eaten by the ellipsis (v4 keeps
-                        // the text in its own truncating box for this reason).
-                        if (showTicks)
-                          const Padding(
-                            padding: EdgeInsets.only(left: 4),
-                            child: Icon(
-                              Icons.done_all_rounded,
-                              size: 15,
-                              color: AppColors.brand500,
+                                  TextSpan(text: line),
+                                ],
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.caption.copyWith(
+                                color: hasUnread
+                                    ? AppColors.textSecondary
+                                    : PulseMotion.previewInk,
+                                fontWeight: hasUnread
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                              ),
                             ),
                           ),
-                        if (hasUnread) ...[
-                          const SizedBox(width: 8),
-                          _UnreadBadge(count: unread),
+                          // The ticks never get eaten by the ellipsis (v4 keeps
+                          // the text in its own truncating box for this reason).
+                          if (showTicks)
+                            const Padding(
+                              padding: EdgeInsets.only(left: 4),
+                              child: Icon(
+                                Icons.done_all_rounded,
+                                size: 15,
+                                color: AppColors.brand500,
+                              ),
+                            ),
+                          if (hasUnread) ...[
+                            const SizedBox(width: 8),
+                            _UnreadBadge(count: unread),
+                          ],
                         ],
-                      ],
-                    ),
-                  ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

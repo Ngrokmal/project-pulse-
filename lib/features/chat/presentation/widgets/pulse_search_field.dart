@@ -66,18 +66,19 @@ class PulseSearchField extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(horizontal: 20),
                       child: Container(
                         height: 48,
-                        padding: const EdgeInsets.only(left: 15, right: 7),
                         decoration: BoxDecoration(
                           color: AppColors.card,
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: AppColors.border),
+                          // `0 18px 34px -24px rgba(42,14,107,.9)` collapses to
+                          // a sliver in Skia and paints as a purple bar floating
+                          // inside the field. Soft haze instead, same intent.
                           boxShadow: [
                             BoxShadow(
                               color: const Color(0xFF2A0E6B)
-                                  .withValues(alpha: 0.32),
-                              offset: const Offset(0, 18),
-                              blurRadius: 34,
-                              spreadRadius: -24,
+                                  .withValues(alpha: 0.10),
+                              offset: const Offset(0, 12),
+                              blurRadius: 26,
                             ),
                             BoxShadow(
                               color: const Color(0xFF2A0E6B)
@@ -87,83 +88,94 @@ class PulseSearchField extends StatelessWidget {
                             ),
                           ],
                         ),
+                        // The bloom is `inset:0` on the field in the reference:
+                        // it has to run the full width, corners and all, even
+                        // under the icon and the close button.
+                        clipBehavior: Clip.antiAlias,
                         child: Stack(
+                          // The row has to sit in the middle of the 48 px field
+                          // — a Stack defaults to the top-left, which is what
+                          // pushed the placeholder up against the top edge.
+                          alignment: Alignment.center,
                           children: [
                             // The purple bloom that lights up inside the field.
                             Positioned.fill(
                               child: IgnorePointer(
                                 child: Opacity(
                                   opacity: open,
-                                  child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(18),
-                                    child: CustomPaint(
-                                      painter: _BloomPainter(
-                                        color: AppColors.brand500,
-                                      ),
+                                  child: CustomPaint(
+                                    painter: _BloomPainter(
+                                      color: AppColors.brand500,
                                     ),
                                   ),
                                 ),
                               ),
                             ),
-                            Row(
-                              children: [
-                                _slideIn(
-                                  icon,
-                                  const PulseIcon(
-                                    paths: PulseIcons.search,
-                                    size: 18,
-                                    color: Color(0xFF9B98AC),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: 15,
+                                right: 7,
+                              ),
+                              child: Row(
+                                children: [
+                                  _slideIn(
+                                    icon,
+                                    const PulseIcon(
+                                      paths: PulseIcons.search,
+                                      size: 18,
+                                      color: Color(0xFF9B98AC),
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: _slideIn(
-                                    field,
-                                    TextField(
-                                      controller: controller,
-                                      focusNode: focusNode,
-                                      onChanged: onChanged,
-                                      style: const TextStyle(
-                                        fontSize: 14.5,
-                                        color: Color(0xFF151418),
-                                        fontFamily: 'Roboto',
-                                      ),
-                                      cursorColor: AppColors.brand600,
-                                      decoration: const InputDecoration(
-                                        isDense: true,
-                                        filled: false,
-                                        border: InputBorder.none,
-                                        enabledBorder: InputBorder.none,
-                                        focusedBorder: InputBorder.none,
-                                        disabledBorder: InputBorder.none,
-                                        errorBorder: InputBorder.none,
-                                        focusedErrorBorder: InputBorder.none,
-                                        contentPadding: EdgeInsets.zero,
-                                        hintText: 'Search messages or people',
-                                        hintStyle: TextStyle(
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: _slideIn(
+                                      field,
+                                      TextField(
+                                        controller: controller,
+                                        focusNode: focusNode,
+                                        onChanged: onChanged,
+                                        style: const TextStyle(
                                           fontSize: 14.5,
-                                          color: Color(0xFFA9A7B4),
+                                          color: Color(0xFF151418),
                                           fontFamily: 'Roboto',
+                                        ),
+                                        cursorColor: AppColors.brand600,
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          filled: false,
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          disabledBorder: InputBorder.none,
+                                          errorBorder: InputBorder.none,
+                                          focusedErrorBorder: InputBorder.none,
+                                          contentPadding: EdgeInsets.zero,
+                                          hintText: 'Search messages or people',
+                                          hintStyle: TextStyle(
+                                            fontSize: 14.5,
+                                            color: Color(0xFFA9A7B4),
+                                            fontFamily: 'Roboto',
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                                _slideIn(
-                                  close,
-                                  PulseIconButton(
-                                    label: 'Close search',
-                                    size: 28,
-                                    onPressed: onClose,
-                                    icon: const PulseIcon(
-                                      paths: PulseIcons.close,
-                                      size: 16,
-                                      color: Color(0xFF9B98AC),
-                                      strokeWidth: 2.2,
+                                  _slideIn(
+                                    close,
+                                    PulseIconButton(
+                                      label: 'Close search',
+                                      size: 28,
+                                      onPressed: onClose,
+                                      icon: const PulseIcon(
+                                        paths: PulseIcons.close,
+                                        size: 16,
+                                        color: Color(0xFF9B98AC),
+                                        strokeWidth: 2.2,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
