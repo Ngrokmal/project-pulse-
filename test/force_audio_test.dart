@@ -121,7 +121,12 @@ void main() {
         'mime_type': 'audio/mp4',
         'state': 'created',
         'created_at': '2026-11-14T10:00:00Z',
-        'expires_at': '2026-11-15T10:00:00Z',
+        // Relative, not a fixed date — a hardcoded future timestamp turns
+        // into a failing test the day it passes.
+        'expires_at': DateTime.now()
+            .toUtc()
+            .add(const Duration(hours: 24))
+            .toIso8601String(),
         'played_at': null,
       });
       expect(alert.state, ForceAudioState.created);

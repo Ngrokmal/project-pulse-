@@ -6,6 +6,8 @@ import 'package:material_ui/material_ui.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
+import '../../../core/motion/pulse_motion.dart';
+import '../../../core/motion/water_ripple.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/state_views.dart';
 import '../../auth/application/auth_controller.dart';
@@ -13,6 +15,7 @@ import '../application/chat_controller.dart';
 import '../domain/conversation.dart';
 import 'widgets/chat_avatar.dart';
 import 'widgets/empty_chats_art.dart';
+import 'widgets/pulse_list_motion.dart';
 
 /// Home = the real conversation list, not a placeholder (§4 A).
 class ChatsScreen extends ConsumerWidget {
@@ -34,77 +37,87 @@ class ChatsScreen extends ConsumerWidget {
         label: const Text('New chat'),
       ),
       body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => ref.read(conversationsProvider.notifier).refresh(),
-          child: CustomScrollView(
-            slivers: [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.screenX,
-                    18,
-                    AppSpacing.screenX,
-                    6,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Messages', style: AppTypography.headlineMedium),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Chat · Call · Connect',
-                        style: AppTypography.caption,
+        child: Column(
+          children: [
+            // The header stays put; only the list travels (as in the reference,
+            // where the title and segments never move).
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.screenX,
+                18,
+                AppSpacing.screenX,
+                12,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Messages', style: AppTypography.headlineMedium),
+                  const SizedBox(height: 2),
+                  Text('Chat · Call · Connect', style: AppTypography.caption),
+                ],
+              ),
+            ),
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () =>
+                    ref.read(conversationsProvider.notifier).refresh(),
+                child: PulseEdgeFade(
+                  child: CustomScrollView(
+                    slivers: [
+                      conversations.when(
+                        loading: () => const SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: PulseLoading(message: 'Loading your chats'),
+                        ),
+                        error: (error, _) => SliverFillRemaining(
+                          hasScrollBody: false,
+                          child: ChatsErrorView(
+                            failure: error is AppFailure
+                                ? error
+                                : const ServerFailure(),
+                            onRetry: () => ref
+                                .read(conversationsProvider.notifier)
+                                .refresh(),
+                          ),
+                        ),
+                        data: (items) {
+                          if (items.isEmpty) {
+                            return SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Center(
+                                child: EmptyChatsArt(
+                                  onStartChat: () =>
+                                      _openNewChatSheet(context, ref),
+                                ),
+                              ),
+                            );
+                          }
+                          return SliverList.separated(
+                            itemCount: items.length,
+                            separatorBuilder: (_, _) =>
+                                const SizedBox(height: PulseMotion.rowGap),
+                            itemBuilder: (context, i) => Padding(
+                              padding: EdgeInsets.fromLTRB(
+                                AppSpacing.screenX,
+                                i == 0 ? PulseMotion.featherTop : 0,
+                                AppSpacing.screenX,
+                                i == items.length - 1 ? 90 : 0,
+                              ),
+                              child: ConversationTile(
+                                conversation: items[i],
+                                myId: myId,
+                                index: i,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),
                 ),
               ),
-              conversations.when(
-                loading: () => const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: PulseLoading(message: 'Loading your chats'),
-                ),
-                error: (error, _) => SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: ChatsErrorView(
-                    failure: error is AppFailure
-                        ? error
-                        : const ServerFailure(),
-                    onRetry: () =>
-                        ref.read(conversationsProvider.notifier).refresh(),
-                  ),
-                ),
-                data: (items) {
-                  if (items.isEmpty) {
-                    return SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: Center(
-                        child: EmptyChatsArt(
-                          onStartChat: () => _openNewChatSheet(context, ref),
-                        ),
-                      ),
-                    );
-                  }
-                  return SliverList.separated(
-                    itemCount: items.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) => Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        AppSpacing.screenX,
-                        0,
-                        AppSpacing.screenX,
-                        i == items.length - 1 ? 90 : 0,
-                      ),
-                      child: ConversationTile(
-                        conversation: items[i],
-                        myId: myId,
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -125,17 +138,26 @@ class ChatsScreen extends ConsumerWidget {
   }
 }
 
-/// One row of the inbox. Public so the layout can be widget-tested without
-/// standing up the whole screen.
+/// One row of the inbox — the v4 card.
+///
+/// Layout, ink, radius, shadows, press/water feedback and the staggered
+/// entrance all come from `pulse-home-reference-v4.html`; the numbers live in
+/// [PulseMotion] and `docs/V4_MOTION_SPEC.md`.
+///
+/// Public so the layout can be widget-tested without standing up the screen.
 class ConversationTile extends StatelessWidget {
   const ConversationTile({
     super.key,
     required this.conversation,
     required this.myId,
+    this.index = 0,
   });
 
   final Conversation conversation;
   final String myId;
+
+  /// Position in the list — drives the 26 ms entrance stagger.
+  final int index;
 
   @override
   Widget build(BuildContext context) {
@@ -143,121 +165,136 @@ class ConversationTile extends StatelessWidget {
     final time = c.lastMessageAt;
     final unread = c.unreadCount;
     final hasUnread = unread > 0;
+    final mineLast = c.isMineLast(myId);
+    final trimmed = c.lastMessagePreview?.trim();
+    final hasPreview = trimmed != null && trimmed.isNotEmpty;
 
-    final preview = c.lastMessagePreview;
-    // What the second line says, in priority order: the real preview, then the
-    // group's member count, then an invitation.
+    // Second line, in priority order: the real preview, the group's size, an
+    // invitation.
     final String line;
-    if (preview != null && preview.trim().isNotEmpty) {
-      line = '${c.isMineLast(myId) ? 'You: ' : ''}$preview';
+    if (hasPreview) {
+      line = trimmed;
     } else if (c.isGroup) {
       line = '${c.subtitleLabel} · no messages yet';
     } else {
       line = 'Say hello';
     }
 
-    return Semantics(
-      button: true,
-      label:
-          '${c.displayName}, '
-          '${hasUnread ? '$unread unread, ' : ''}$line',
-      child: Material(
-        color: AppColors.card,
-        borderRadius: AppRadius.cardRadius,
-        child: InkWell(
-          borderRadius: AppRadius.cardRadius,
-          onTap: () => context.push('/chat/${c.id}'),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 11, 14, 11),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                ChatAvatar(
-                  label: c.initials,
-                  isGroup: c.isGroup,
-                  imageUrl: c.avatarUrl,
-                  size: 52,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              c.displayName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.titleMedium.copyWith(
-                                fontWeight: hasUnread
-                                    ? FontWeight.w700
-                                    : FontWeight.w600,
-                              ),
+    final showTicks = mineLast && hasPreview;
+    final spokenLine = showTicks ? 'You: $line' : line;
+
+    return PulseRowMotion(
+      index: index,
+      seenKey: c.id,
+      child: PulseTapSurface(
+        onTap: () => context.push('/chat/${c.id}'),
+        semanticsLabel:
+            '${c.displayName}, '
+            '${hasUnread ? '$unread unread, ' : ''}$spokenLine',
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: PulseMotion.rowSurface,
+            borderRadius: BorderRadius.circular(PulseMotion.rowRadius),
+            boxShadow: PulseMotion.rowShadow,
+          ),
+          padding: const EdgeInsets.fromLTRB(12, 10, 14, 10),
+          child: Row(
+            children: [
+              _Avatar(c: c),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            c.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.titleMedium.copyWith(
+                              color: PulseMotion.nameInk,
+                              fontWeight: hasUnread
+                                  ? FontWeight.w700
+                                  : FontWeight.w700,
                             ),
                           ),
-                          if (c.isGroup && c.memberCount > 0) ...[
-                            const SizedBox(width: 6),
-                            _Pill(
-                              icon: Icons.groups_rounded,
-                              text: '${c.memberCount}',
-                            ),
-                          ],
-                          const Spacer(),
-                          if (time != null)
-                            Text(
-                              _formatTime(time),
-                              style: AppTypography.caption.copyWith(
-                                color: hasUnread
-                                    ? AppColors.brand600
-                                    : AppColors.textMuted,
-                                fontWeight: hasUnread
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                              ),
-                            ),
+                        ),
+                        if (c.isGroup && c.memberCount > 0) ...[
+                          const SizedBox(width: 6),
+                          _Pill(
+                            icon: Icons.groups_rounded,
+                            text: '${c.memberCount}',
+                          ),
                         ],
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          if (c.isMineLast(myId) && preview != null)
-                            const Padding(
-                              padding: EdgeInsets.only(right: 3),
-                              child: Icon(
-                                Icons.done_all_rounded,
-                                size: 14,
-                                color: AppColors.brand600,
-                              ),
-                            ),
-                          Expanded(
-                            child: Text(
-                              line,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.caption.copyWith(
-                                color: hasUnread
-                                    ? AppColors.textSecondary
-                                    : AppColors.textMuted,
-                                fontWeight: hasUnread
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                              ),
+                        const Spacer(),
+                        if (time != null)
+                          Text(
+                            _formatTime(time),
+                            style: AppTypography.caption.copyWith(
+                              color: hasUnread
+                                  ? AppColors.brand600
+                                  : AppColors.textMuted,
+                              fontWeight: hasUnread
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
                             ),
                           ),
-                          if (hasUnread) ...[
-                            const SizedBox(width: 8),
-                            _UnreadBadge(count: unread),
-                          ],
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text.rich(
+                            TextSpan(
+                              children: [
+                                if (showTicks)
+                                  const TextSpan(
+                                    text: 'You: ',
+                                    style: TextStyle(
+                                      color: AppColors.brand600,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                TextSpan(text: line),
+                              ],
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.caption.copyWith(
+                              color: hasUnread
+                                  ? AppColors.textSecondary
+                                  : PulseMotion.previewInk,
+                              fontWeight: hasUnread
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        // The ticks never get eaten by the ellipsis (v4 keeps
+                        // the text in its own truncating box for this reason).
+                        if (showTicks)
+                          const Padding(
+                            padding: EdgeInsets.only(left: 4),
+                            child: Icon(
+                              Icons.done_all_rounded,
+                              size: 15,
+                              color: AppColors.brand500,
+                            ),
+                          ),
+                        if (hasUnread) ...[
+                          const SizedBox(width: 8),
+                          _UnreadBadge(count: unread),
                         ],
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -273,6 +310,35 @@ class ConversationTile extends StatelessWidget {
     if (diff == 1) return 'Yesterday';
     if (diff < 7) return DateFormat('EEE').format(time);
     return DateFormat.MMMd().format(time);
+  }
+}
+
+/// The avatar slot. The presence dot lives here (not inside [ChatAvatar]) so it
+/// can sit on the right, stay a fixed 16 px and never inherit a scale.
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.c});
+
+  final Conversation c;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: PulseMotion.avatarSize,
+      height: PulseMotion.avatarSize,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ChatAvatar(
+            label: c.initials,
+            isGroup: c.isGroup,
+            imageUrl: c.avatarUrl,
+            size: PulseMotion.avatarSize,
+          ),
+          // No presence source yet — Phase F adds Supabase presence, so nothing
+          // is drawn here rather than guessing "online".
+        ],
+      ),
+    );
   }
 }
 
