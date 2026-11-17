@@ -98,7 +98,9 @@ begin
   return seen;
 end $$;
 
-revoke all on function public.touch_presence() from public;
+-- `public` alone is not enough on a Supabase project: its default privileges
+-- hand every new function to `anon` as well, so both are named explicitly.
+revoke all on function public.touch_presence() from public, anon;
 grant execute on function public.touch_presence() to authenticated;
 
 -- ------------------------------------------------------------------- realtime

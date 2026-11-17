@@ -107,6 +107,23 @@ begin
   end;
 end $$;
 
+-- the EXECUTE grant is the second lock: anon cannot even reach the function
+do $$
+begin
+  begin
+    perform has_function_privilege('anon', 'public.touch_presence()', 'execute');
+    insert into _r (name, ok, detail)
+    select 'anon has no EXECUTE on touch_presence',
+           not has_function_privilege('anon', 'public.touch_presence()', 'execute'),
+           'anon_exec=' || has_function_privilege('anon', 'public.touch_presence()', 'execute')::text;
+  end;
+end $$;
+
+insert into _r (name, ok, detail)
+select 'authenticated may call touch_presence',
+       has_function_privilege('authenticated', 'public.touch_presence()', 'execute'),
+       'authenticated_exec';
+
 -- --------------------------------------------------- original media names
 reset role;
 set local role authenticated;
