@@ -143,6 +143,14 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
           ? await picker.pickImage()
           : await picker.pickAny();
       if (media == null) return;
+      final unsupported = PickedMedia.unsupportedMessage(media.fileName);
+      if (unsupported != null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(unsupported)));
+        }
+        return;
+      }
       final sizeError = PickedMedia.validateSize(
         media.resourceType,
         media.sizeBytes,

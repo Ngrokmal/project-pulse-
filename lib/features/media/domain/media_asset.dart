@@ -30,6 +30,29 @@ class PickedMedia {
     'heif',
     'bmp',
   };
+
+  /// Extensions this Cloudinary account **refuses to deliver** (HTTP 401
+  /// "Untrusted File Access") even though the upload succeeds. Probed against
+  /// the live account: pdf, zip, rar, 7z, gz, bz2, tgz are blocked; docx, xlsx,
+  /// pptx, doc, csv, json, txt, tar, iso, epub, mp3, m4a, wav are not.
+  ///
+  /// Blocked files are still sent — as an opaque `.dat` blob — and the real name
+  /// travels in `messages.media_name`, so the receiver gets `report.pdf` back.
+  static const Set<String> deliveryBlockedExtensions = {
+    'pdf',
+    'zip',
+    'rar',
+    '7z',
+    'gz',
+    'bz2',
+    'tgz',
+  };
+
+  /// Extensions Cloudinary rejects outright at upload ("resources with
+  /// extension apk are not allowed"). We refuse them here, with a readable
+  /// message, instead of letting the upload fail with a server error.
+  static const Set<String> refusedExtensions = {'exe', 'apk', 'msi'};
+
   static const Set<String> videoExtensions = {
     'mp4',
     'mov',
@@ -52,6 +75,30 @@ class PickedMedia {
     final dot = fileName.lastIndexOf('.');
     if (dot < 0 || dot == fileName.length - 1) return '';
     return fileName.substring(dot + 1).toLowerCase();
+  }
+
+  /// The name handed to Cloudinary. Only differs from [fileName] for document
+  /// types that the CDN would refuse to serve.
+  String get uploadFilename {
+    if (resourceType != MediaResourceType.raw) return fileName;
+    final ext = extensionOf(fileName);
+    if (!deliveryBlockedExtensions.contains(ext)) return fileName;
+    final stem = fileName.substring(0, fileName.lastIndexOf('.'));
+    final safeStem = stem.trim().isEmpty ? 'file' : stem;
+    return '$safeStem.dat';
+  }
+
+  /// True when the name was rewritten for delivery (the UI does not care, but
+  /// the logs and the tests do).
+  bool get isDisguisedForDelivery =>
+      resourceType == MediaResourceType.raw &&
+      deliveryBlockedExtensions.contains(extensionOf(fileName));
+
+  /// Null when this file may be sent, else a sentence for the user.
+  static String? unsupportedMessage(String fileName) {
+    final ext = extensionOf(fileName);
+    if (!refusedExtensions.contains(ext)) return null;
+    return 'For safety, .$ext files cannot be sent in Pulse.';
   }
 
   static int limitFor(MediaResourceType type) => switch (type) {

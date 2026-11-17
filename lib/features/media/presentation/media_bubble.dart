@@ -1,10 +1,10 @@
 import 'package:material_ui/material_ui.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../chat/domain/message.dart';
 import '../domain/media_asset.dart';
 import '../domain/media_labels.dart';
+import 'file_attachment_card.dart';
 import 'image_viewer.dart';
 import 'video_player_view.dart';
 
@@ -35,12 +35,6 @@ class MediaBubble extends StatelessWidget {
 
   String? get _byline =>
       MediaLabels.byline(mine: mine, myName: myName, peerName: peerName);
-
-  Future<void> _openFile(String url) async {
-    final uri = Uri.tryParse(url);
-    if (uri == null) return;
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -82,16 +76,8 @@ class MediaBubble extends StatelessWidget {
           byline: byline,
         ),
       ),
-      MessageKind.audio ||
-      MessageKind.forceAudio ||
-      MessageKind.file => _FileCard(
-        name: name,
-        byline: byline,
-        size: MediaLabels.meta(message),
-        kind: message.kind,
-        mine: mine,
-        onOpen: () => _openFile(url),
-      ),
+      MessageKind.audio || MessageKind.forceAudio || MessageKind.file =>
+        FileAttachmentCard(message: message, mine: mine, byline: byline),
       MessageKind.text => const SizedBox.shrink(),
     };
   }
@@ -315,140 +301,6 @@ class _VideoCard extends StatelessWidget {
             ),
           ),
       ],
-    );
-  }
-}
-
-/// Audio / document: extension badge, real name, sender → recipient, size.
-class _FileCard extends StatelessWidget {
-  const _FileCard({
-    required this.name,
-    required this.byline,
-    required this.size,
-    required this.kind,
-    required this.mine,
-    required this.onOpen,
-  });
-
-  final String name;
-  final String? byline;
-  final String? size;
-  final MessageKind kind;
-  final bool mine;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = mine ? Colors.white : AppColors.textPrimary;
-    final muted = mine
-        ? Colors.white.withValues(alpha: 0.76)
-        : AppColors.textMuted;
-    final isAudio = kind == MessageKind.audio;
-    final gradient = isAudio
-        ? const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF8E7BF6), Color(0xFF4F25C4)],
-          )
-        : const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFFFF8A8A), Color(0xFFE23D4B)],
-          );
-
-    return SizedBox(
-      width: 236,
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: BorderRadius.circular(10),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x4D4F25C4),
-                  blurRadius: 18,
-                  offset: Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Text(
-              MediaLabels.extensionBadge(name),
-              style: const TextStyle(
-                fontSize: 9.5,
-                height: 1,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.4,
-                color: Colors.white,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.25,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
-                  ),
-                ),
-                if (byline != null)
-                  Text(
-                    byline!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      height: 1.3,
-                      fontWeight: FontWeight.w600,
-                      color: muted,
-                    ),
-                  ),
-                if (size != null)
-                  Text(
-                    size!,
-                    style: TextStyle(
-                      fontSize: 10.5,
-                      height: 1.3,
-                      fontWeight: FontWeight.w600,
-                      color: muted.withValues(alpha: 0.8),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: onOpen,
-            child: Container(
-              width: 34,
-              height: 34,
-              decoration: BoxDecoration(
-                color: mine
-                    ? Colors.white.withValues(alpha: 0.22)
-                    : AppColors.brand100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                isAudio ? Icons.graphic_eq_rounded : Icons.download_rounded,
-                size: 17,
-                color: mine ? Colors.white : AppColors.brand700,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

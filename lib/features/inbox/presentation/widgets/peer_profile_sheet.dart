@@ -530,43 +530,67 @@ class _ProfileArtPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final center = size.center(Offset.zero);
 
-    // ---- the conic ring around the 96 px avatar (radius 30 squircle).
+    // ---- the ring around the 96 px avatar: a soft halo pass, then one crisp
+    // 2.4 px conic stroke. Nothing blurred on top of the stroke itself, so the
+    // line reads sharp instead of smeared.
     final ringRect = Rect.fromCenter(center: center, width: 100, height: 100);
+    final ringRRect = RRect.fromRectAndRadius(
+      ringRect,
+      const Radius.circular(32),
+    );
+    final sweep = SweepGradient(
+      colors: const [
+        InboxPalette.cyan,
+        Color(0xFF7B5FED),
+        Color(0xFFE1D9FC),
+        InboxPalette.cyan,
+      ],
+      stops: const [0, 0.38, 0.62, 1],
+      transform: GradientRotation(ringAngle),
+    ).createShader(ringRect);
+
     canvas.drawRRect(
-      RRect.fromRectAndRadius(ringRect, const Radius.circular(32)),
+      ringRRect.inflate(2.5),
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.5
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3)
-        ..shader = SweepGradient(
-          colors: const [
-            InboxPalette.cyan,
-            Color(0xFF7B5FED),
-            Color(0xFFE1D9FC),
-            InboxPalette.cyan,
-          ],
-          stops: const [0, 0.38, 0.62, 1],
-          transform: GradientRotation(ringAngle),
-        ).createShader(ringRect),
+        ..strokeWidth = 5
+        ..shader = sweep
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5)
+        ..color = Colors.white.withValues(alpha: 0.55),
+    );
+    canvas.drawRRect(
+      ringRRect,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round
+        ..isAntiAlias = true
+        ..shader = sweep,
     );
 
-    // ---- orbit A: a cyan spark on a 118 px circle.
+    // ---- orbit A: a cyan spark on a 118 px circle, tiny halo + sharp core.
+    final sparkA =
+        center + Offset(math.cos(orbitA) * 61, math.sin(orbitA) * 61);
     canvas.drawCircle(
-      center + Offset(math.cos(orbitA) * 61, math.sin(orbitA) * 61),
-      3.5,
+      sparkA,
+      6,
       Paint()
-        ..color = InboxPalette.cyan
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.4),
+        ..color = InboxPalette.cyan.withValues(alpha: 0.35)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5),
     );
+    canvas.drawCircle(sparkA, 3.4, Paint()..color = InboxPalette.cyan);
 
     // ---- orbit B: a violet spark on a 134 px circle, reversed.
+    final sparkB =
+        center + Offset(math.cos(orbitB) * 67, math.sin(orbitB) * 67);
     canvas.drawCircle(
-      center + Offset(math.cos(orbitB) * 67, math.sin(orbitB) * 67),
-      2.5,
+      sparkB,
+      5,
       Paint()
-        ..color = const Color(0xFFC7B6FF)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
+        ..color = const Color(0xFFC7B6FF).withValues(alpha: 0.32)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
     );
+    canvas.drawCircle(sparkB, 2.8, Paint()..color = const Color(0xFFC7B6FF));
   }
 
   @override

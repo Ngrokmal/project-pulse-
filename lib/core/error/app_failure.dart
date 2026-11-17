@@ -145,6 +145,39 @@ class ConfigurationFailure extends AppFailure {
   bool get isRetryable => false;
 }
 
+enum MediaFailureReason { unavailable, tooLarge, write, badUrl }
+
+/// A file whose *bytes* could not be handed over, said plainly.
+///
+/// `unavailable` is the honest one: some attachments were stored under file
+/// types the CDN refuses to serve (a Cloudinary account setting we cannot change
+/// from the app), so the row exists but the bytes are gone. New uploads avoid
+/// that by sending such documents as opaque blobs.
+class MediaFailure extends AppFailure {
+  const MediaFailure(this.reason, {super.correlationId});
+
+  final MediaFailureReason reason;
+
+  @override
+  String get code => 'media_${reason.name}';
+
+  @override
+  String get userMessage => switch (reason) {
+    MediaFailureReason.unavailable =>
+      "This file can't be downloaded — it was sent before attachments were "
+          "fixed and the media service no longer serves it.",
+    MediaFailureReason.tooLarge =>
+      'This file is too large to save on this device.',
+    MediaFailureReason.write => "Couldn't save the file on this device.",
+    MediaFailureReason.badUrl => 'This attachment link is not valid.',
+  };
+
+  @override
+  bool get isRetryable =>
+      reason == MediaFailureReason.write ||
+      reason == MediaFailureReason.unavailable;
+}
+
 class StorageFailure extends AppFailure {
   const StorageFailure({required this.insufficientSpace});
   final bool insufficientSpace;

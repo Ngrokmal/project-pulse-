@@ -30,7 +30,9 @@ class DeliveryTicks extends StatelessWidget {
     };
 
     final ticks = CustomPaint(
-      size: const Size(16, 11),
+      // Two checks reach x=17; the canvas has to be wide enough or the second
+      // stroke is clipped and looks like a smudge.
+      size: const Size(18, 12),
       painter: _TicksPainter(
         color: color.withValues(alpha: opacity),
         doubleTick: state == InboxDelivery.seen,
@@ -90,33 +92,42 @@ class _TicksPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round;
-    if (glow) {
-      paint.maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.4);
-    }
-
-    final s = size.height / 11;
+    final s = size.height / 12;
     canvas.scale(s);
 
-    // First check: 1,7 → 4,10 → 9.5,3 (reference path).
     final first = Path()
       ..moveTo(1, 6.7)
       ..lineTo(4.2, 9.9)
       ..lineTo(doubleTick ? 9.2 : 10.6, 2.4);
-    canvas.drawPath(first, paint);
 
-    if (doubleTick) {
-      final second = Path()
-        ..moveTo(7.4, 6.7)
-        ..lineTo(10.6, 9.9)
-        ..lineTo(17, 2.4);
-      canvas.drawPath(second, paint);
+    final second = Path()
+      ..moveTo(7.4, 6.7)
+      ..lineTo(10.6, 9.9)
+      ..lineTo(17, 2.4);
+
+    // The glow is a *separate* pass, wide and soft, painted first. Blurring the
+    // stroke itself (the old code) is what made the ticks look out of focus.
+    if (glow) {
+      final halo = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.4
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..color = color.withValues(alpha: 0.42)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.8);
+      canvas.drawPath(first, halo);
+      if (doubleTick) canvas.drawPath(second, halo);
     }
+
+    final crisp = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.7
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..isAntiAlias = true
+      ..color = color;
+    canvas.drawPath(first, crisp);
+    if (doubleTick) canvas.drawPath(second, crisp);
   }
 
   @override

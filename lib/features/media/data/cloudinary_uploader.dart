@@ -77,7 +77,15 @@ class CloudinaryUploader {
           ..fields['upload_preset'] = uploadPreset
           ..fields['folder'] = 'pulse/messages'
           ..files.add(
-            http.MultipartFile('file', stream, total, filename: media.fileName),
+            // `.pdf` / `.zip` / archives are served by Cloudinary as HTTP 401
+            // "Untrusted File Access"; the same bytes under `.dat` are served
+            // normally, and the original name is stored in `media_name`.
+            http.MultipartFile(
+              'file',
+              stream,
+              total,
+              filename: media.uploadFilename,
+            ),
           );
 
     try {
