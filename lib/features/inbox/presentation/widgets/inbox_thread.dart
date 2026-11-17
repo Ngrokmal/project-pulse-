@@ -22,6 +22,8 @@ class InboxThread extends StatelessWidget {
     required this.emptyState,
     required this.onRetry,
     required this.onDelete,
+    this.myName,
+    this.peerName,
   });
 
   final List<InboxCell> cells;
@@ -31,6 +33,10 @@ class InboxThread extends StatelessWidget {
   final Widget emptyState;
   final VoidCallback onRetry;
   final ValueChanged<Message> onDelete;
+
+  /// Used for the `Saiful → Mahmoud` line under every attachment.
+  final String? myName;
+  final String? peerName;
 
   @override
   Widget build(BuildContext context) {
@@ -73,6 +79,8 @@ class InboxThread extends StatelessWidget {
               if (cell.showDay) DayDivider(when: cell.createdAt, now: now),
               MessageRow(
                 cell: cell,
+                myName: myName,
+                peerName: peerName,
                 onRetry: onRetry,
                 onDelete: cell.mine && !cell.message.isDeleted
                     ? () => onDelete(cell.message)

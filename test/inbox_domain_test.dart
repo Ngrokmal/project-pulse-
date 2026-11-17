@@ -140,7 +140,9 @@ void main() {
   group('level mapping', () {
     test('the level scales geometry exactly like the reference', () {
       expect(InboxMotion.hintLift(0), 0);
-      expect(InboxMotion.hintLift(1), -3.4);
+      // Trimmed from the reference's -3.4 so a magnified glyph (1.15×) stays
+      // inside the 32 px pill; the lift is the only value we re-tuned.
+      expect(InboxMotion.hintLift(1), -2.4);
       expect(InboxMotion.hintScale(1), closeTo(1.15, 1e-9));
       expect(InboxMotion.hintOpacity(1), closeTo(1.0, 1e-9));
       expect(InboxMotion.haloSpread(1), 5);

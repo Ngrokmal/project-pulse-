@@ -22,9 +22,14 @@ abstract interface class ChatRepository {
     required String body,
     MessageKind kind = MessageKind.text,
     String? mediaUrl,
+    String? mediaName,
     int? mediaBytes,
     int? durationMs,
   });
+
+  /// How much has been said in a conversation: total messages and how many of
+  /// them carry a file, for the peer profile card.
+  Future<ConversationStats> stats(String conversationId);
 
   /// Soft-deletes one of my own messages.
   Future<void> deleteMessage(String messageId);
@@ -81,6 +86,17 @@ class GroupMember {
   final String displayName;
   final GroupRole? role;
   final String? username;
+}
+
+/// Counts shown on the profile card. Read with `count: exact` on the server, so
+/// the numbers are the table's, not a page of it.
+class ConversationStats {
+  const ConversationStats({this.messages = 0, this.media = 0});
+
+  final int messages;
+  final int media;
+
+  static const ConversationStats empty = ConversationStats();
 }
 
 class ChatPeerSummary {

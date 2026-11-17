@@ -12,38 +12,50 @@ import '../../domain/inbox_palette.dart';
 /// reference formula, fed by the same level as everything else and painted
 /// through `repaint: level` so no widget rebuilds per frame.
 class RecorderWave extends StatelessWidget {
-  const RecorderWave({super.key, required this.level, required this.paused});
+  const RecorderWave({
+    super.key,
+    required this.level,
+    required this.paused,
+    this.bars = InboxMotion.waveformBars,
+  });
 
   final InboxAudioLevel level;
   final bool paused;
+
+  /// 22 bars when there is room; fewer, thicker bars when the hint needs space.
+  final int bars;
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: CustomPaint(
         size: const Size(double.infinity, 26),
-        painter: _RecorderWavePainter(level: level, paused: paused),
+        painter: _RecorderWavePainter(level: level, paused: paused, bars: bars),
       ),
     );
   }
 }
 
 class _RecorderWavePainter extends CustomPainter {
-  _RecorderWavePainter({required this.level, required this.paused})
-    : super(repaint: level);
+  _RecorderWavePainter({
+    required this.level,
+    required this.paused,
+    required this.bars,
+  }) : super(repaint: level);
 
   final InboxAudioLevel level;
   final bool paused;
+  final int bars;
 
   @override
   void paint(Canvas canvas, Size size) {
     if (size.width <= 0) return;
     final lvl = paused ? 0.0 : level.value;
-    final bars = InboxMotion.waveformBars;
-    const gap = 2.0;
-    final barWidth = ((size.width - gap * (bars - 1)) / bars).clamp(1.6, 6.0);
-    final spacing = bars > 1
-        ? (size.width - barWidth) / (bars - 1)
+    final count = bars.clamp(4, InboxMotion.waveformBars);
+    final gap = count >= 16 ? 2.0 : 2.5;
+    final barWidth = ((size.width - gap * (count - 1)) / count).clamp(1.8, 6.0);
+    final spacing = count > 1
+        ? (size.width - barWidth) / (count - 1)
         : size.width;
     final radius = Radius.circular(barWidth / 2);
     final phase = level.time * 1000 / 130;
@@ -51,7 +63,7 @@ class _RecorderWavePainter extends CustomPainter {
       ..color = InboxPalette.brand400.withValues(alpha: 0.55 + lvl * 0.45);
     final centerY = size.height / 2;
 
-    for (var i = 0; i < bars; i++) {
+    for (var i = 0; i < count; i++) {
       final shape = InboxMotion.barShape(phase, i);
       final wobble = math.sin(phase * 0.7 + i * 0.9);
       final height = InboxMotion.recorderBar(lvl, shape, wobble);
@@ -67,7 +79,7 @@ class _RecorderWavePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RecorderWavePainter oldDelegate) =>
-      oldDelegate.paused != paused;
+      oldDelegate.paused != paused || oldDelegate.bars != bars;
 }
 
 /// The halo around the recorder pill: `0 0 0 (level*5)px rgba(danger, .16+lvl*.2)`.

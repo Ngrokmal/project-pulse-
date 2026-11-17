@@ -22,9 +22,13 @@ class MessageRow extends StatelessWidget {
     required this.cell,
     required this.onRetry,
     required this.onDelete,
+    this.myName,
+    this.peerName,
   });
 
   final InboxCell cell;
+  final String? myName;
+  final String? peerName;
   final VoidCallback onRetry;
   final VoidCallback? onDelete;
 
@@ -132,7 +136,12 @@ class MessageRow extends StatelessWidget {
           stackNext: cell.stackNext,
           maxWidth: maxWidth,
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 7),
-          child: MediaBubble(message: message, mine: cell.mine && !failed),
+          child: MediaBubble(
+            message: message,
+            mine: cell.mine && !failed,
+            myName: myName,
+            peerName: peerName,
+          ),
         );
       case MessageKind.text:
         return TextBubble(

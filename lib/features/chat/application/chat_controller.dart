@@ -218,6 +218,8 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
     /// Length of a voice note, so the receiver's bubble knows its duration.
     int? durationMs,
   }) async {
+    // The name the user's device had — shown verbatim in the bubble.
+    final mediaName = media.fileName;
     final current = state.value ?? const ChatThreadState(messages: []);
     final upload = ref.read(mediaUploadProvider.notifier);
     final asset = await upload.upload(media);
@@ -232,6 +234,7 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
       kind: kind,
       createdAt: DateTime.now(),
       mediaUrl: asset.secureUrl,
+      mediaName: mediaName,
       mediaBytes: asset.bytes,
       durationMs: durationMs,
       clientId: clientId,
@@ -250,6 +253,7 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
             body: '',
             kind: kind,
             mediaUrl: asset.secureUrl,
+            mediaName: mediaName,
             mediaBytes: asset.bytes,
             durationMs: durationMs,
           );

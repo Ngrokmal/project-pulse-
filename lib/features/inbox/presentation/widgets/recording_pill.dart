@@ -137,31 +137,47 @@ class _RecordingPillState extends ConsumerState<RecordingPill>
                       ),
                       child: LayoutBuilder(
                         builder: (context, constraints) {
-                          final dotWidth = 9.0;
-                          final timeWidth = 34.0;
-                          final gaps = 6.0 * 4;
-                          final hintNatural = VoiceHint.measure(
+                          const dotWidth = 9.0;
+                          const timeWidth = 33.0;
+                          const gap = 5.0;
+                          final fixed = dotWidth + timeWidth + gap * 3;
+
+                          final fullHint = VoiceHint.measure(hintText, style);
+                          final textOnly = VoiceHint.measure(
                             hintText,
                             style,
+                            meter: false,
                           );
-                          final available =
-                              constraints.maxWidth -
-                              dotWidth -
-                              timeWidth -
-                              gaps;
-                          const minWave = 44.0;
-                          final hintWidth = math.max(
-                            0.0,
-                            math.min(hintNatural, available - minWave),
+
+                          // Give the hint its natural width first; drop the
+                          // meter before shrinking anything, and only then take
+                          // space from the bars. Nothing is ever scaled down.
+                          var showMeter = true;
+                          var hintWidth = fullHint;
+                          var waveWidth =
+                              constraints.maxWidth - fixed - hintWidth;
+                          if (waveWidth < 36) {
+                            showMeter = false;
+                            hintWidth = textOnly;
+                            waveWidth =
+                                constraints.maxWidth - fixed - hintWidth;
+                          }
+                          if (waveWidth < 28) {
+                            waveWidth = 28;
+                            hintWidth = math.max(
+                              0.0,
+                              constraints.maxWidth - fixed - waveWidth,
+                            );
+                          }
+                          final bars = (waveWidth / 4.2).floor().clamp(
+                            6,
+                            InboxMotion.waveformBars,
                           );
-                          final waveWidth = math.max(
-                            minWave,
-                            available - hintWidth,
-                          );
+
                           return Row(
                             children: [
                               _RecDot(paused: paused),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: gap),
                               SizedBox(
                                 width: timeWidth,
                                 child: Text(
@@ -180,7 +196,7 @@ class _RecordingPillState extends ConsumerState<RecordingPill>
                                   ),
                                 ),
                               ),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: gap),
                               SizedBox(
                                 width: waveWidth,
                                 child: Opacity(
@@ -188,16 +204,16 @@ class _RecordingPillState extends ConsumerState<RecordingPill>
                                   child: RecorderWave(
                                     level: level,
                                     paused: paused,
+                                    bars: bars,
                                   ),
                                 ),
                               ),
-                              if (hintWidth > 0) ...[
-                                const SizedBox(width: 6),
+                              if (hintWidth > 4) ...[
+                                const SizedBox(width: gap),
                                 SizedBox(
                                   width: hintWidth,
                                   child: ClipRect(
-                                    child: FittedBox(
-                                      fit: BoxFit.scaleDown,
+                                    child: Align(
                                       alignment: Alignment.centerRight,
                                       child: VoiceHint(
                                         level: level,
@@ -209,6 +225,7 @@ class _RecordingPillState extends ConsumerState<RecordingPill>
                                             ? InboxPalette.muted
                                             : InboxPalette.brand700,
                                         paused: paused,
+                                        showMeter: showMeter,
                                       ),
                                     ),
                                   ),

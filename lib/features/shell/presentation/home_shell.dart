@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../account_status/presentation/account_gate.dart';
 import '../../calls/presentation/calls_screen.dart';
 import '../../notifications/presentation/push_banner.dart';
+import '../../presence/application/presence_controller.dart';
 import '../../chat/presentation/chats_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 
@@ -29,6 +30,8 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Keeps `user_presence` warm while the signed-in shell is on screen.
+    ref.watch(presenceHeartbeatProvider);
     return Scaffold(
       body: AccountGate(
         child: Column(

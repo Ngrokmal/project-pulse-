@@ -33,6 +33,7 @@ class Message {
     this.body,
     this.mediaUrl,
     this.mediaThumbUrl,
+    this.mediaName,
     this.mediaBytes,
     this.durationMs,
     this.clientId,
@@ -48,6 +49,9 @@ class Message {
   final String? body;
   final String? mediaUrl;
   final String? mediaThumbUrl;
+
+  /// The original file name the sender's device had (never parsed out of a URL).
+  final String? mediaName;
   final int? mediaBytes;
   final int? durationMs;
   final String? clientId;
@@ -65,6 +69,7 @@ class Message {
     body: map['body'] as String?,
     mediaUrl: map['media_url'] as String?,
     mediaThumbUrl: map['media_thumb_url'] as String?,
+    mediaName: map['media_name'] as String?,
     mediaBytes: (map['media_bytes'] as num?)?.toInt(),
     durationMs: (map['duration_ms'] as num?)?.toInt(),
     clientId: map['client_id'] as String?,
@@ -81,6 +86,7 @@ class Message {
     'body': body,
     'media_url': mediaUrl,
     'media_thumb_url': mediaThumbUrl,
+    'media_name': mediaName,
     'media_bytes': mediaBytes,
     'duration_ms': durationMs,
     'client_id': clientId,
@@ -97,6 +103,7 @@ class Message {
         body: body,
         mediaUrl: mediaUrl,
         mediaThumbUrl: mediaThumbUrl,
+        mediaName: mediaName,
         mediaBytes: mediaBytes,
         durationMs: durationMs,
         clientId: clientId,

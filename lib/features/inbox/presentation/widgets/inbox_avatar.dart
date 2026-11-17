@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../domain/inbox_motion.dart';
 import '../../domain/inbox_palette.dart';
 
@@ -235,15 +236,16 @@ class _PresenceDotState extends State<_PresenceDot>
   @override
   void initState() {
     super.initState();
-    if (widget.presence == AvatarPresence.typing) _pulse.repeat(reverse: true);
+    if (widget.presence != AvatarPresence.offline) _pulse.repeat(reverse: true);
   }
 
   @override
   void didUpdateWidget(_PresenceDot oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.presence == AvatarPresence.typing && !_pulse.isAnimating) {
+    if (widget.presence != AvatarPresence.offline && !_pulse.isAnimating) {
       _pulse.repeat(reverse: true);
-    } else if (widget.presence != AvatarPresence.typing && _pulse.isAnimating) {
+    } else if (widget.presence == AvatarPresence.offline &&
+        _pulse.isAnimating) {
       _pulse
         ..stop()
         ..value = 0;
@@ -259,7 +261,9 @@ class _PresenceDotState extends State<_PresenceDot>
   @override
   Widget build(BuildContext context) {
     final online = widget.presence != AvatarPresence.offline;
-    final colorDot = online ? InboxPalette.brand500 : InboxPalette.ghost;
+    // Green for a live presence, grey when they are away — with the same white
+    // ring the reference draws around the dot.
+    final colorDot = online ? AppColors.online : InboxPalette.ghost;
     return AnimatedBuilder(
       animation: _pulse,
       builder: (context, _) {

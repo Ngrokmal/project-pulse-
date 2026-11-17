@@ -262,11 +262,9 @@ class _MessageFieldState extends State<_MessageField> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: _focused
-              ? InboxPalette.brand500.withValues(alpha: 0.45)
-              : InboxPalette.hairline,
-        ),
+        // One hairline, always — no violet line appearing inside the field when
+        // it takes focus. The focus cue is the shadow only.
+        border: Border.all(color: InboxPalette.hairline),
         boxShadow: _focused ? InboxPalette.fieldFocused : InboxPalette.field,
       ),
       child: Center(

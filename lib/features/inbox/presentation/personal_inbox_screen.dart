@@ -13,6 +13,9 @@ import '../../chat/presentation/group_info_sheet.dart';
 import '../../force_audio/presentation/force_audio_sheet.dart';
 import '../../media/data/file_picker_source.dart';
 import '../../media/domain/media_asset.dart';
+import '../../presence/application/presence_controller.dart';
+import '../../presence/domain/presence.dart';
+import '../../profile/application/profile_controller.dart';
 import '../application/voice_playback_controller.dart';
 import '../application/voice_recording_controller.dart';
 import '../domain/inbox_palette.dart';
@@ -25,6 +28,7 @@ import 'widgets/inbox_header.dart';
 import 'widgets/inbox_thread.dart';
 import 'widgets/jump_to_latest.dart';
 import 'widgets/offline_bar.dart';
+import 'widgets/peer_profile_sheet.dart';
 import 'widgets/upload_progress_bar.dart';
 
 /// The personal inbox — one conversation, rebuilt from
@@ -172,6 +176,18 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
     showForceAudioSheet(context, conversationId: widget.conversationId);
   }
 
+  /// Tapping the avatar or the name opens the friend's profile card (v3's
+  /// `p-sheet`) — the same card for both entry points.
+  void _openProfile(Conversation conversation) {
+    PeerProfileSheet.show(
+      context,
+      conversation: conversation,
+      onMessage: () => _focus.requestFocus(),
+      onCall: () => _startCall(conversation, CallKind.audio),
+      onVideoCall: () => _startCall(conversation, CallKind.video),
+    );
+  }
+
   Future<void> _startCall(Conversation conversation, CallKind kind) async {
     final router = GoRouter.of(context);
     final messenger = ScaffoldMessenger.of(context);
@@ -260,6 +276,21 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
 
     final canCall = conversation != null && !isGroup;
 
+    // Presence is read, never guessed: the provider polls `user_presence` while
+    // this screen is alive, and the label is derived at build time.
+    final peerId = conversation != null && !isGroup ? conversation.peer.id : '';
+    final presence = peerId.isEmpty
+        ? Presence.unknown
+        : ref.watch(peerPresenceProvider(peerId)).value ?? Presence.unknown;
+    final now = DateTime.now();
+    final myName =
+        ref.watch(profileControllerProvider).value?.displayName ??
+        (ref.watch(authControllerProvider) is AuthSignedIn
+            ? (ref.watch(
+                authControllerProvider,
+              ) as AuthSignedIn).user.displayName
+            : null);
+
     return Scaffold(
       backgroundColor: InboxPalette.shellMid,
       body: InboxBackdrop(
@@ -274,6 +305,8 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
                     compact: _compact,
                     peerTyping: state?.peerTyping ?? false,
                     offline: state?.offline ?? false,
+                    presence: presence,
+                    now: now,
                     onBack: () =>
                         context.canPop() ? context.pop() : context.go('/app'),
                     onCall: canCall
@@ -285,6 +318,11 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
                     onInfo: isGroup && conversation != null
                         ? () => GroupInfoSheet.show(context, conversation)
                         : null,
+                    onProfile: conversation == null
+                        ? null
+                        : (isGroup
+                              ? () => GroupInfoSheet.show(context, conversation)
+                              : () => _openProfile(conversation)),
                   ),
                   OfflineBar(visible: state?.offline ?? false),
                   Expanded(
@@ -310,6 +348,8 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
                             )
                             .retryFailed(),
                         onDelete: _confirmDelete,
+                        myName: myName,
+                        peerName: conversation?.displayName,
                         emptyState: InboxEmptyState(
                           peerName: conversation?.displayName ?? 'them',
                           onSuggestion: _onSuggestion,

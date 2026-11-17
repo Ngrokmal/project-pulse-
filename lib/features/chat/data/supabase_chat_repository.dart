@@ -101,6 +101,7 @@ class SupabaseChatRepository implements ChatRepository {
     required String body,
     MessageKind kind = MessageKind.text,
     String? mediaUrl,
+    String? mediaName,
     int? mediaBytes,
     int? durationMs,
   }) async {
@@ -121,6 +122,7 @@ class SupabaseChatRepository implements ChatRepository {
             'kind': messageKindToDb(kind),
             'body': kind == MessageKind.text ? body.trim() : null,
             'media_url': mediaUrl,
+            'media_name': mediaName,
             'media_bytes': mediaBytes,
             'duration_ms': durationMs,
             'client_id': clientId,
@@ -244,6 +246,26 @@ class SupabaseChatRepository implements ChatRepository {
           .toList();
     } on PostgrestException catch (e) {
       throw _map(e, 'people');
+    }
+  }
+
+  @override
+  Future<ConversationStats> stats(String conversationId) async {
+    try {
+      final all = await _client
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .count(CountOption.exact);
+      final media = await _client
+          .from('messages')
+          .select('id')
+          .eq('conversation_id', conversationId)
+          .neq('kind', 'text')
+          .count(CountOption.exact);
+      return ConversationStats(messages: all.count, media: media.count);
+    } on PostgrestException catch (e) {
+      throw _map(e, 'stats');
     }
   }
 

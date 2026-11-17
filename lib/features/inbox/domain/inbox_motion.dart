@@ -67,9 +67,11 @@ class InboxMotion {
     6,
   );
 
-  /// The hint runs at 9.5 px / 800 weight with a 0.1 px tracking (reference).
+  /// The hint runs at 11 px / 800 weight (reference 9.5 px is a caption on a
+  /// 392 px mock; on a 360 dp phone it was unreadable, so it is scaled up and the
+  /// lift is trimmed to keep every letter inside the pill).
   static const TextStyle hintStyle = TextStyle(
-    fontSize: 9.5,
+    fontSize: 11,
     height: 1,
     fontWeight: FontWeight.w800,
     letterSpacing: 0.1,
@@ -81,7 +83,7 @@ class InboxMotion {
 
   // ------------------------------------------------ level → geometry (0..1)
   /// Hint letters: translateY up to −3.4 px, scale up to 1.15, opacity .6 → 1.
-  static double hintLift(double level) => -3.4 * level;
+  static double hintLift(double level) => -2.4 * level;
   static double hintScale(double level) => 1 + 0.15 * level;
   static double hintOpacity(double level) => 0.6 + 0.4 * level;
 

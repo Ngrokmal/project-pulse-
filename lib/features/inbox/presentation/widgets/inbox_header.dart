@@ -1,6 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/theme/app_colors.dart';
 import '../../../chat/domain/conversation.dart';
+import '../../../presence/domain/presence.dart';
 import '../../domain/inbox_motion.dart';
 import '../../domain/inbox_palette.dart';
 import 'inbox_avatar.dart';
@@ -17,7 +19,10 @@ class InboxHeader extends StatelessWidget {
     required this.compact,
     required this.peerTyping,
     required this.offline,
+    required this.presence,
+    required this.now,
     required this.onBack,
+    required this.onProfile,
     required this.onCall,
     required this.onVideoCall,
     required this.onInfo,
@@ -27,7 +32,12 @@ class InboxHeader extends StatelessWidget {
   final bool compact;
   final bool peerTyping;
   final bool offline;
+
+  /// The peer's real presence (server `last_seen_at`), never a guess.
+  final Presence presence;
+  final DateTime now;
   final VoidCallback onBack;
+  final VoidCallback? onProfile;
   final VoidCallback? onCall;
   final VoidCallback? onVideoCall;
   final VoidCallback? onInfo;
@@ -40,13 +50,31 @@ class InboxHeader extends StatelessWidget {
 
   bool get _isGroup => conversation?.isGroup ?? false;
 
+  bool get _online => !_isGroup && !peerTyping && presence.isOnlineAt(now);
+
+  /// `online` in green, `last seen 5m ago` in muted, `typing` in brand — the
+  /// reference's three states, all backed by data.
+  String get _statusLabel {
+    if (peerTyping) return 'typing';
+    if (_isGroup) return conversation?.subtitleLabel ?? 'Group';
+    if (offline) return 'offline — showing saved messages';
+    return presence.label(now);
+  }
+
+  Color get _statusColor {
+    if (peerTyping) return InboxPalette.brand600;
+    if (offline) return InboxPalette.danger;
+    if (_online) return AppColors.online;
+    return InboxPalette.muted;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final presence = peerTyping
+    final avatarPresence = peerTyping
         ? AvatarPresence.typing
-        : offline
-        ? AvatarPresence.offline
-        : AvatarPresence.active;
+        : _online || (conversation?.isGroup ?? false)
+        ? AvatarPresence.active
+        : AvatarPresence.offline;
 
     return AnimatedContainer(
       duration: InboxMotion.headerCompact,
@@ -85,13 +113,13 @@ class InboxHeader extends StatelessWidget {
           InboxAvatar(
             initials: _initials,
             seed: _seed,
-            presence: presence,
-            onTap: onInfo,
+            presence: avatarPresence,
+            onTap: onProfile,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: GestureDetector(
-              onTap: onInfo,
+              onTap: onProfile,
               behavior: HitTestBehavior.opaque,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,10 +139,9 @@ class InboxHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 1),
                   _StatusLine(
-                    peerTyping: peerTyping,
-                    offline: offline,
-                    isGroup: _isGroup,
-                    subtitle: conversation?.subtitleLabel ?? 'on Pulse',
+                    label: _statusLabel,
+                    color: _statusColor,
+                    typing: peerTyping,
                   ),
                 ],
               ),
@@ -168,37 +195,21 @@ class InboxHeader extends StatelessWidget {
   }
 }
 
-/// Animated status line: colour eases between online-green, typing-violet and
-/// muted, and the typing dots ride along (reference `typeDot`).
+/// Animated status line: the colour eases between green (online), violet
+/// (typing) and muted (last seen), and the typing dots ride along.
 class _StatusLine extends StatelessWidget {
   const _StatusLine({
-    required this.peerTyping,
-    required this.offline,
-    required this.isGroup,
-    required this.subtitle,
+    required this.label,
+    required this.color,
+    required this.typing,
   });
 
-  final bool peerTyping;
-  final bool offline;
-  final bool isGroup;
-  final String subtitle;
+  final String label;
+  final Color color;
+  final bool typing;
 
   @override
   Widget build(BuildContext context) {
-    final color = peerTyping
-        ? InboxPalette.brand600
-        : offline
-        ? InboxPalette.muted
-        : InboxPalette.brand500;
-
-    final label = peerTyping
-        ? 'typing'
-        : offline
-        ? 'offline — showing saved messages'
-        : isGroup
-        ? subtitle
-        : subtitle;
-
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 240),
       switchInCurve: Curves.easeOut,
@@ -208,7 +219,7 @@ class _StatusLine extends StatelessWidget {
         children: [...previous, ?current],
       ),
       child: Row(
-        key: ValueKey('$label-${peerTyping ? 1 : 0}'),
+        key: ValueKey('$label-${typing ? 1 : 0}'),
         mainAxisSize: MainAxisSize.min,
         children: [
           Flexible(
@@ -224,7 +235,7 @@ class _StatusLine extends StatelessWidget {
               ),
             ),
           ),
-          if (peerTyping) ...[
+          if (typing) ...[
             const SizedBox(width: 1),
             TypingDotsInline(color: color),
           ],

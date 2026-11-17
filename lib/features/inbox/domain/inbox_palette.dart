@@ -97,9 +97,12 @@ class InboxPalette {
   static const List<BoxShadow> field = [
     BoxShadow(color: Color(0x162A0E6B), blurRadius: 28, offset: Offset(0, 14)),
   ];
+
+  /// Focus reads through depth, not a drawn line: a deeper violet drop plus one
+  /// soft near-shadow. No ring, no spread ring, no border.
   static const List<BoxShadow> fieldFocused = [
-    BoxShadow(color: Color(0x4D5F3FDC), blurRadius: 30, offset: Offset(0, 16)),
-    BoxShadow(color: Color(0x1F7B5FED), blurRadius: 0, spreadRadius: 3),
+    BoxShadow(color: Color(0x5C5F3FDC), blurRadius: 34, offset: Offset(0, 16)),
+    BoxShadow(color: Color(0x265F3FDC), blurRadius: 14, offset: Offset(0, 6)),
   ];
   static const List<BoxShadow> roundButton = [
     BoxShadow(color: Color(0x1F2A0E6B), blurRadius: 24, offset: Offset(0, 12)),
