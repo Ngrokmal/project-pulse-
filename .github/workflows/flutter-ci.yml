@@ -10,6 +10,10 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Publishing the update release needs to write releases (and nothing else).
+permissions:
+  contents: write
+
 env:
   FLUTTER_VERSION: "3.50.0"
   # Public fingerprint of the Pulse upload certificate (safe to publish; the
@@ -128,7 +132,11 @@ jobs:
 
       - name: Build release APK
         run: |
+          # The build number IS the update channel: it is what the installed app
+          # compares itself against, and it must go up on every push.
           flutter build apk --release \
+            --build-name="0.1.${{ github.run_number }}" \
+            --build-number="${{ github.run_number }}" \
             --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
             --dart-define=SUPABASE_ANON_KEY="${{ secrets.SUPABASE_ANON_KEY }}" \
             --dart-define=CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUD_NAME }}" \
@@ -170,3 +178,43 @@ jobs:
           path: build/app/outputs/flutter-apk/*.apk
           retention-days: 14
           if-no-files-found: error
+
+      # `latest.json` + the APK in one GitHub Release is the whole update server:
+      # the app reads `releases/latest/download/latest.json`, compares the build
+      # number with its own, and downloads the sibling `pulse.apk`. Publishing is
+      # skipped on pull requests, which must never move the update channel.
+      - name: Publish the update release
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.run_number }}
+          NOTES: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          cp "$APK" pulse.apk
+          SHA=$(sha256sum pulse.apk | awk '{print $1}')
+          SIZE=$(stat -c%s pulse.apk)
+          VERSION="0.1.$RUN"
+          {
+            printf '{\n'
+            printf '  "versionName": "%s",\n' "$VERSION"
+            printf '  "versionCode": %s,\n' "$RUN"
+            printf '  "apkUrl": "https://github.com/%s/releases/latest/download/pulse.apk",\n' "${{ github.repository }}"
+            printf '  "sizeBytes": %s,\n' "$SIZE"
+            printf '  "sha256": "%s",\n' "$SHA"
+            printf '  "publishedAt": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            printf '  "notes": [\n'
+            # The commit subject and up to three of its body lines, as real JSON
+            # strings — the update page shows them verbatim.
+            printf '%s\n' "$NOTES" | head -4 | sed '/^$/d' | sed 's/^[[:space:]]*//' \
+              | jq -R . | paste -sd, - | sed 's/^/  /'
+            printf '\n  ]\n'
+            printf '}\n'
+          } > latest.json
+          python3 -c "import json;json.load(open('latest.json'));print('manifest is valid JSON')"
+          echo "::notice::publishing $VERSION (build $RUN, $SIZE bytes, sha256 ${SHA:0:12}…)"
+          gh release create "build-$RUN" pulse.apk latest.json \
+            --title "Pulse $VERSION" \
+            --notes "Automatic build $RUN from \`${GITHUB_SHA::7}\`. Installed apps will offer this update on next launch." \
+            --latest
