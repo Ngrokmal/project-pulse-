@@ -131,6 +131,29 @@ class ServerFailure extends AppFailure {
   bool get isRetryable => (statusCode == null || statusCode! >= 500);
 }
 
+/// A feature whose backend half has not been applied yet.
+///
+/// This exists so the Explore tab can say the true thing ("run 0010_friends.sql")
+/// instead of a vague "something went wrong", and so a partially migrated
+/// backend is never mistaken for a bug in the app.
+class FeatureUnavailableFailure extends AppFailure {
+  const FeatureUnavailableFailure(this.feature);
+
+  /// What is missing, in one or two words — e.g. `friends`.
+  final String feature;
+
+  @override
+  String get code => 'feature_unavailable_$feature';
+
+  @override
+  String get userMessage =>
+      'This build’s backend is missing the $feature tables. '
+      'Apply supabase/migrations/0010_friends.sql and try again.';
+
+  @override
+  bool get isRetryable => true;
+}
+
 class ConfigurationFailure extends AppFailure {
   const ConfigurationFailure(this.detail);
   final String detail;
