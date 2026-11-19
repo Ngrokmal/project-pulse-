@@ -1,3 +1,4 @@
+import 'dart:ffi' show Abi;
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
@@ -46,6 +47,7 @@ class UpdateState {
   const UpdateState({
     this.phase = UpdatePhase.idle,
     this.update,
+    this.variant,
     this.received = 0,
     this.total = 0,
     this.apkPath,
@@ -56,6 +58,10 @@ class UpdateState {
 
   final UpdatePhase phase;
   final AppUpdate? update;
+
+  /// The file chosen for *this* device's CPU — the only one worth showing a
+  /// size or a hash for.
+  final UpdateVariant? variant;
   final int received;
   final int total;
   final String? apkPath;
@@ -93,6 +99,7 @@ class UpdateState {
   UpdateState copyWith({
     UpdatePhase? phase,
     AppUpdate? update,
+    UpdateVariant? variant,
     int? received,
     int? total,
     String? apkPath,
@@ -105,6 +112,7 @@ class UpdateState {
     return UpdateState(
       phase: phase ?? this.phase,
       update: update ?? this.update,
+      variant: variant ?? this.variant,
       received: received ?? this.received,
       total: total ?? this.total,
       apkPath: clearApkPath ? null : (apkPath ?? this.apkPath),
@@ -117,6 +125,45 @@ class UpdateState {
 
 /// The installed build, read from the APK itself rather than from a constant, so
 /// a sideloaded CI artifact always knows exactly what it is.
+/// The ABI key this manifest uses for this device.
+///
+/// `dart:ffi` already knows the architecture the app was built for; this only
+/// maps it to the words the release manifest uses (`arm64`, `arm32`, `x64`,
+/// `x86`). Anything unrecognised falls back to `arm64`, which is what almost
+/// every phone in the world runs.
+String deviceAbiKey() {
+  final abi = Abi.current();
+  if (abi == Abi.androidArm64 ||
+      abi == Abi.androidRiscv64 ||
+      abi == Abi.iosArm64 ||
+      abi == Abi.iosArm64e ||
+      abi == Abi.macosArm64 ||
+      abi == Abi.macosArm64e ||
+      abi == Abi.linuxArm64 ||
+      abi == Abi.windowsArm64 ||
+      abi == Abi.fuchsiaArm64) {
+    return 'arm64';
+  }
+  if (abi == Abi.androidArm || abi == Abi.iosArm || abi == Abi.linuxArm) {
+    return 'arm32';
+  }
+  if (abi == Abi.androidX64 ||
+      abi == Abi.iosX64 ||
+      abi == Abi.macosX64 ||
+      abi == Abi.linuxX64 ||
+      abi == Abi.windowsX64 ||
+      abi == Abi.fuchsiaX64) {
+    return 'x64';
+  }
+  if (abi == Abi.androidIA32 ||
+      abi == Abi.linuxIA32 ||
+      abi == Abi.windowsIA32 ||
+      abi == Abi.linuxRiscv32) {
+    return 'x86';
+  }
+  return 'arm64';
+}
+
 class InstalledBuild {
   const InstalledBuild({required this.versionName, required this.versionCode});
 
@@ -232,20 +279,34 @@ class UpdateController extends Notifier<UpdateState> {
       return;
     }
 
+    final abi = deviceAbiKey();
+    final variant = latest.variantFor(abi);
+    if (variant == null) {
+      // The channel published only other architectures. Say nothing and leave
+      // the app alone rather than offer a download that cannot install.
+      state = state.copyWith(
+        phase: UpdatePhase.upToDate,
+        canInstall: canInstall,
+      );
+      return;
+    }
+
     final store = await ref.read(updateStoreProvider.future);
     final reusable = await store.reusableApk(
       versionCode: latest.versionCode,
-      sha256: latest.sha256,
-      sizeBytes: latest.sizeBytes,
+      abi: abi,
+      sha256: variant.sha256,
+      sizeBytes: variant.sizeBytes,
     );
     final skipped = await store.skippedVersionCode();
 
     state = UpdateState(
       phase: reusable == null ? UpdatePhase.available : UpdatePhase.ready,
       update: latest,
+      variant: variant,
       apkPath: reusable,
-      total: latest.sizeBytes,
-      received: reusable == null ? 0 : latest.sizeBytes,
+      total: variant.sizeBytes,
+      received: reusable == null ? 0 : variant.sizeBytes,
       canInstall: canInstall,
       skipped: skipped == latest.versionCode,
     );
@@ -256,16 +317,22 @@ class UpdateController extends Notifier<UpdateState> {
   /// packet is how a download makes the UI stutter.
   Future<void> download() async {
     final update = state.update;
-    if (update == null || state.phase == UpdatePhase.downloading) return;
+    final variant = state.variant;
+    if (update == null ||
+        variant == null ||
+        state.phase == UpdatePhase.downloading) {
+      return;
+    }
 
+    final abi = deviceAbiKey();
     final store = await ref.read(updateStoreProvider.future);
-    final part = store.partFile(update.versionCode);
+    final part = store.partFile(update.versionCode, abi);
     if (part.existsSync()) part.deleteSync();
 
     state = state.copyWith(
       phase: UpdatePhase.downloading,
       received: 0,
-      total: update.sizeBytes,
+      total: variant.sizeBytes,
       clearMessage: true,
       clearApkPath: true,
     );
@@ -275,7 +342,7 @@ class UpdateController extends Notifier<UpdateState> {
     IOSink? sink;
 
     try {
-      final request = http.Request('GET', Uri.parse(update.apkUrl));
+      final request = http.Request('GET', Uri.parse(variant.apkUrl));
       final response = await client.send(request);
       if (response.statusCode != 200) {
         throw ServerFailure(safeCode: 'update_download_${response.statusCode}');
@@ -299,19 +366,20 @@ class UpdateController extends Notifier<UpdateState> {
       await sink.close();
       sink = null;
 
-      if (received != update.sizeBytes) {
+      if (received != variant.sizeBytes) {
         throw const ServerFailure(safeCode: 'update_size_mismatch');
       }
 
       final digest = await _sha256OfFile(part);
-      if (digest != update.sha256) {
+      if (digest != variant.sha256) {
         if (part.existsSync()) part.deleteSync();
         throw const ServerFailure(safeCode: 'update_hash_mismatch');
       }
 
       final file = store.commit(
         versionCode: update.versionCode,
-        sha256: update.sha256,
+        abi: abi,
+        sha256: variant.sha256,
       );
 
       state = state.copyWith(
@@ -348,7 +416,7 @@ class UpdateController extends Notifier<UpdateState> {
     final update = state.update;
     if (update == null) return;
     final store = await ref.read(updateStoreProvider.future);
-    final part = store.partFile(update.versionCode);
+    final part = store.partFile(update.versionCode, deviceAbiKey());
     if (part.existsSync()) part.deleteSync();
     state = state.copyWith(phase: UpdatePhase.available, received: 0);
   }
@@ -402,7 +470,7 @@ class UpdateController extends Notifier<UpdateState> {
   Future<void> forgetDownload() async {
     final code = state.update?.versionCode;
     final store = await ref.read(updateStoreProvider.future);
-    if (code != null) store.discard(code);
+    if (code != null) store.discard(code, deviceAbiKey());
     await store.clearSkip();
     state = const UpdateState();
   }

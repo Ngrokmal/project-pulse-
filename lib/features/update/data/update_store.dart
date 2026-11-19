@@ -25,14 +25,17 @@ class UpdateStore {
     return UpdateStore(dir);
   }
 
-  File apkFile(int versionCode) =>
-      File('${directory.path}/pulse-$versionCode.apk');
+  // The ABI is part of every name: two files for the same build are two
+  // different binaries, and reusing the wrong one would be an install of the
+  // wrong architecture.
+  File apkFile(int versionCode, String abi) =>
+      File('${directory.path}/pulse-$versionCode-$abi.apk');
 
-  File _partFile(int versionCode) =>
-      File('${directory.path}/pulse-$versionCode.apk.part');
+  File _partFile(int versionCode, String abi) =>
+      File('${directory.path}/pulse-$versionCode-$abi.apk.part');
 
-  File _stampFile(int versionCode) =>
-      File('${directory.path}/pulse-$versionCode.apk.ok');
+  File _stampFile(int versionCode, String abi) =>
+      File('${directory.path}/pulse-$versionCode-$abi.apk.ok');
 
   File get _stateFile => File('${directory.path}/state.json');
 
@@ -40,35 +43,40 @@ class UpdateStore {
   /// describes.
   Future<String?> reusableApk({
     required int versionCode,
+    required String abi,
     required String sha256,
     required int sizeBytes,
   }) async {
-    final apk = apkFile(versionCode);
-    final stamp = _stampFile(versionCode);
+    final apk = apkFile(versionCode, abi);
+    final stamp = _stampFile(versionCode, abi);
     if (!apk.existsSync() || !stamp.existsSync()) return null;
     if (apk.lengthSync() != sizeBytes) return null;
     final verified = (stamp.readAsStringSync()).trim().toLowerCase();
     return verified == sha256.toLowerCase() ? apk.path : null;
   }
 
-  File partFile(int versionCode) => _partFile(versionCode);
+  File partFile(int versionCode, String abi) => _partFile(versionCode, abi);
 
   /// Marks a verified download as good and clears the partial.
-  File commit({required int versionCode, required String sha256}) {
-    final part = _partFile(versionCode);
-    final finalFile = apkFile(versionCode);
+  File commit({
+    required int versionCode,
+    required String abi,
+    required String sha256,
+  }) {
+    final part = _partFile(versionCode, abi);
+    final finalFile = apkFile(versionCode, abi);
     if (finalFile.existsSync()) finalFile.deleteSync();
     final moved = part.renameSync(finalFile.path);
-    _stampFile(versionCode).writeAsStringSync(sha256.toLowerCase());
+    _stampFile(versionCode, abi).writeAsStringSync(sha256.toLowerCase());
     _clearOthers(keep: versionCode);
     return moved;
   }
 
-  void discard(int versionCode) {
+  void discard(int versionCode, String abi) {
     for (final file in <File>[
-      apkFile(versionCode),
-      _partFile(versionCode),
-      _stampFile(versionCode),
+      apkFile(versionCode, abi),
+      _partFile(versionCode, abi),
+      _stampFile(versionCode, abi),
     ]) {
       if (file.existsSync()) file.deleteSync();
     }
@@ -80,7 +88,8 @@ class UpdateStore {
       if (entity is! File) continue;
       final name = entity.uri.pathSegments.last;
       if (!name.startsWith('pulse-')) continue;
-      if (name.startsWith('pulse-$keep.apk')) continue;
+      // Keep this build's files (every ABI of it), drop the rest.
+      if (name.startsWith('pulse-$keep-')) continue;
       entity.deleteSync();
     }
   }

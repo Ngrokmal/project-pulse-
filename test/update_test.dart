@@ -45,15 +45,46 @@ class _FakeInstaller implements ApkInstaller {
   Future<void> install(String apkPath) async => installed.add(apkPath);
 }
 
-AppUpdate _manifest({required String sha, required int size, int code = 42}) =>
-    AppUpdate(
-      versionName: '0.1.$code',
-      versionCode: code,
+/// A manifest for this host's ABI, plus a decoy for the other one, so the tests
+/// also prove the device picks its own file.
+AppUpdate _manifest({required String sha, required int size, int code = 42}) {
+  final mine = deviceAbiKey();
+  final other = mine == 'arm64' ? 'arm32' : 'arm64';
+  return AppUpdate(
+    versionName: '0.1.$code',
+    versionCode: code,
+    notes: const <String>['One thing changed'],
+    variants: <String, UpdateVariant>{
+      mine: UpdateVariant(
+        apkUrl: 'https://example.test/pulse-$mine.apk',
+        sizeBytes: size,
+        sha256: sha,
+      ),
+      other: UpdateVariant(
+        apkUrl: 'https://example.test/pulse-$other.apk',
+        sizeBytes: size * 3,
+        sha256: '0' * 64,
+      ),
+    },
+  );
+}
+
+/// The old, universal shape every release before per-ABI splitting used.
+AppUpdate _flatManifest({
+  required String sha,
+  required int size,
+  int code = 42,
+}) => AppUpdate(
+  versionName: '0.1.$code',
+  versionCode: code,
+  variants: <String, UpdateVariant>{
+    'universal': UpdateVariant(
       apkUrl: 'https://example.test/pulse.apk',
       sizeBytes: size,
       sha256: sha,
-      notes: const <String>['One thing changed'],
-    );
+    ),
+  },
+);
 
 String _shaOf(List<int> bytes) => sha256.convert(bytes).toString();
 
@@ -91,22 +122,66 @@ void main() {
   }
 
   group('the manifest', () {
-    test('a complete manifest parses', () {
+    test('a complete per-ABI manifest parses', () {
       final update = AppUpdate.tryParse(<String, Object?>{
         'versionName': '0.1.42',
         'versionCode': 42,
-        'apkUrl': 'https://example.test/pulse.apk',
-        'sizeBytes': 1024 * 1024 * 4,
-        'sha256': 'a' * 64,
         'notes': <String>['Faster inbox', ' ', 'Sharper ticks'],
         'publishedAt': '2026-11-19T10:00:00Z',
+        'abis': <String, Object?>{
+          'arm64': <String, Object?>{
+            'apkUrl': 'https://example.test/pulse-arm64.apk',
+            'sizeBytes': 26 * 1024 * 1024,
+            'sha256': 'a' * 64,
+          },
+          'arm32': <String, Object?>{
+            'apkUrl': 'https://example.test/pulse-armv7.apk',
+            'sizeBytes': 24 * 1024 * 1024,
+            'sha256': 'b' * 64,
+          },
+        },
       });
 
       expect(update, isNotNull);
       expect(update!.versionCode, 42);
-      expect(update.sizeLabel, '4.0 MB');
+      expect(update.variants.keys, containsAll(<String>['arm64', 'arm32']));
+      expect(update.variantFor('arm64')!.sizeLabel, '26.0 MB');
+      expect(update.variantFor('arm32')!.sizeLabel, '24.0 MB');
       expect(update.notes, <String>['Faster inbox', 'Sharper ticks']);
       expect(update.publishedAt, isNotNull);
+    });
+
+    test('a flat universal manifest still parses and serves every ABI', () {
+      final update = AppUpdate.tryParse(<String, Object?>{
+        'versionName': '0.1.41',
+        'versionCode': 41,
+        'apkUrl': 'https://example.test/pulse.apk',
+        'sizeBytes': 1024 * 1024 * 67,
+        'sha256': 'c' * 64,
+      });
+
+      expect(update, isNotNull);
+      expect(update!.variantFor('arm64')!.sizeLabel, '67.0 MB');
+      expect(update.variantFor('x86'), isNotNull);
+    });
+
+    test('a manifest with only other architectures offers nothing', () {
+      final mine = deviceAbiKey();
+      final other = mine == 'arm64' ? 'arm32' : 'arm64';
+      final update = AppUpdate.tryParse(<String, Object?>{
+        'versionName': '0.1.42',
+        'versionCode': 42,
+        'abis': <String, Object?>{
+          other: <String, Object?>{
+            'apkUrl': 'https://example.test/pulse-x.apk',
+            'sizeBytes': 4096,
+            'sha256': 'd' * 64,
+          },
+        },
+      });
+
+      expect(update, isNotNull);
+      expect(update!.variantFor(mine), isNull);
     });
 
     test('an http URL, a short hash or an empty file is not an update', () {
@@ -151,6 +226,23 @@ void main() {
       expect(state.shouldPrompt, isTrue);
       expect(state.progress, isNull);
     });
+
+    test(
+      'a universal release still updates a device with no exact ABI',
+      () async {
+        final container = containerWith(
+          repository: _FakeRepo(_flatManifest(sha: 'h' * 64, size: 4096)),
+          installer: _FakeInstaller(),
+          store: UpdateStore(temp),
+        );
+
+        await container.read(updateControllerProvider.notifier).checkAtBoot();
+
+        final state = container.read(updateControllerProvider);
+        expect(state.phase, UpdatePhase.available);
+        expect(state.variant, isNotNull);
+      },
+    );
 
     test('the same build number prompts nothing', () async {
       final container = containerWith(
@@ -211,6 +303,7 @@ void main() {
       expect(state.percent, 100);
       expect(state.apkPath, isNotNull);
       expect(File(state.apkPath!).readAsBytesSync(), bytes);
+      expect(state.apkPath, contains(deviceAbiKey()));
       expect(hits, 1);
 
       // A second launch, with the same manifest: the APK is already there.
@@ -253,8 +346,8 @@ void main() {
       final state = container.read(updateControllerProvider);
       expect(state.phase, UpdatePhase.failed);
       expect(state.apkPath, isNull);
-      expect(store.apkFile(42).existsSync(), isFalse);
-      expect(store.partFile(42).existsSync(), isFalse);
+      expect(store.apkFile(42, deviceAbiKey()).existsSync(), isFalse);
+      expect(store.partFile(42, deviceAbiKey()).existsSync(), isFalse);
     });
   });
 
@@ -280,7 +373,10 @@ void main() {
       await controller.install();
 
       expect(installer.installed, hasLength(1));
-      expect(installer.installed.single, endsWith('pulse-42.apk'));
+      expect(
+        installer.installed.single,
+        endsWith('pulse-42-${deviceAbiKey()}.apk'),
+      );
     });
 
     test(
@@ -319,16 +415,25 @@ void main() {
     final json = jsonEncode(<String, Object?>{
       'versionName': '0.1.99',
       'versionCode': 99,
-      'apkUrl': 'https://github.com/Ngrokmal/project-pulse-/releases/latest/download/pulse.apk',
-      'sizeBytes': 24 * 1024 * 1024,
-      'sha256': '1' * 64,
       'publishedAt': '2026-11-19T10:00:00Z',
       'notes': <String>['fix(explore): Message opens the real inbox'],
+      'abis': <String, Object?>{
+        'arm64': <String, Object?>{
+          'apkUrl': 'https://github.com/Ngrokmal/project-pulse-/releases/latest/download/pulse-arm64.apk',
+          'sizeBytes': 26 * 1024 * 1024,
+          'sha256': '1' * 64,
+        },
+        'arm32': <String, Object?>{
+          'apkUrl': 'https://github.com/Ngrokmal/project-pulse-/releases/latest/download/pulse-armv7.apk',
+          'sizeBytes': 23 * 1024 * 1024,
+          'sha256': '2' * 64,
+        },
+      },
     });
 
     final update = AppUpdate.tryParse(jsonDecode(json));
     expect(update, isNotNull);
-    expect(update!.sizeLabel, '24.0 MB');
+    expect(update!.variantFor('arm64')!.sizeLabel, '26.0 MB');
     expect(update.notes.single, startsWith('fix(explore)'));
   });
 }

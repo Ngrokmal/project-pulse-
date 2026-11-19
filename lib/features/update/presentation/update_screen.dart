@@ -162,7 +162,7 @@ class _Header extends StatelessWidget {
         Text(
           update == null
               ? 'One quick request to the release channel.'
-              : '${update.sizeLabel} · ${update.notes.isEmpty ? 'Polish and fixes' : '${update.notes.length} changes'}',
+              : '${state.variant?.sizeLabel ?? update.sizeLabel} · ${update.notes.isEmpty ? 'Polish and fixes' : '${update.notes.length} changes'}',
           textAlign: TextAlign.center,
           style: const TextStyle(
             fontSize: 12.5,
@@ -426,7 +426,7 @@ class _Body extends StatelessWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Downloaded and verified — ${update.sizeLabel}. '
+                        'Downloaded and verified — ${state.variant?.sizeLabel ?? update.sizeLabel}. '
                         'It stays on the phone, so nothing is fetched twice.',
                         style: const TextStyle(
                           fontSize: 11.5,

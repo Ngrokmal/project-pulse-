@@ -134,7 +134,13 @@ jobs:
         run: |
           # The build number IS the update channel: it is what the installed app
           # compares itself against, and it must go up on every push.
+          #
+          # `--split-per-abi` ships one APK per CPU instead of one that carries
+          # every architecture: a phone uses exactly one set of native libraries,
+          # so 67 MB of universal APK becomes ~26 MB for arm64 and ~23 MB for the
+          # old 32-bit phones. x86_64 (emulators only) is built and dropped.
           flutter build apk --release \
+            --split-per-abi \
             --build-name="0.1.${{ github.run_number }}" \
             --build-number="${{ github.run_number }}" \
             --dart-define=SUPABASE_URL="${{ secrets.SUPABASE_URL }}" \
@@ -142,9 +148,18 @@ jobs:
             --dart-define=CLOUDINARY_CLOUD_NAME="${{ secrets.CLOUDINARY_CLOUD_NAME }}" \
             --dart-define=BUILD_LABEL="$(git rev-parse --short HEAD)-run${{ github.run_number }}"
 
+      - name: Assert every ABI slice was produced
+        run: |
+          ls -la build/app/outputs/flutter-apk/
+          for abi in arm64-v8a armeabi-v7a; do
+            APK=build/app/outputs/flutter-apk/app-$abi-release.apk
+            [ -f "$APK" ] || { echo "::error::missing $APK"; exit 1; }
+          done
+          echo "arm64 + armv7 slices present"
+
       - name: Assert the release manifest can reach the network
         run: |
-          APK=build/app/outputs/flutter-apk/app-release.apk
+          APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | tail -1)
           "$AAPT2" dump permissions "$APK" | tee /tmp/perms.txt
           # Phase 1/2 APKs shipped without INTERNET: every request failed and the
@@ -157,7 +172,7 @@ jobs:
 
       - name: Assert the APK is signed with the Pulse upload key
         run: |
-          APK=build/app/outputs/flutter-apk/app-release.apk
+          APK=build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
           APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | tail -1)
           "$APKSIGNER" verify --print-certs "$APK" | tee /tmp/certs.txt
           if [ -f android/key.properties ]; then
@@ -191,19 +206,40 @@ jobs:
           NOTES: ${{ github.event.head_commit.message }}
         run: |
           set -euo pipefail
-          APK=build/app/outputs/flutter-apk/app-release.apk
-          cp "$APK" pulse.apk
-          SHA=$(sha256sum pulse.apk | awk '{print $1}')
-          SIZE=$(stat -c%s pulse.apk)
+          APKDIR=build/app/outputs/flutter-apk
+          cp "$APKDIR/app-arm64-v8a-release.apk" pulse-arm64.apk
+          cp "$APKDIR/app-armeabi-v7a-release.apk" pulse-armv7.apk
+
+          SHA64=$(sha256sum pulse-arm64.apk | awk '{print $1}')
+          SIZE64=$(stat -c%s pulse-arm64.apk)
+          SHA32=$(sha256sum pulse-armv7.apk | awk '{print $1}')
+          SIZE32=$(stat -c%s pulse-armv7.apk)
           VERSION="0.1.$RUN"
+          BASE="https://github.com/${{ github.repository }}/releases/latest/download"
+
           {
             printf '{\n'
             printf '  "versionName": "%s",\n' "$VERSION"
             printf '  "versionCode": %s,\n' "$RUN"
-            printf '  "apkUrl": "https://github.com/%s/releases/latest/download/pulse.apk",\n' "${{ github.repository }}"
-            printf '  "sizeBytes": %s,\n' "$SIZE"
-            printf '  "sha256": "%s",\n' "$SHA"
             printf '  "publishedAt": "%s",\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            # Kept flat, pointing at the arm64 slice: a build from before
+            # per-ABI splitting only understands this shape, and it must still be
+            # able to update itself once.
+            printf '  "apkUrl": "%s/pulse-arm64.apk",\n' "$BASE"
+            printf '  "sizeBytes": %s,\n' "$SIZE64"
+            printf '  "sha256": "%s",\n' "$SHA64"
+            printf '  "abis": {\n'
+            printf '    "arm64": {\n'
+            printf '      "apkUrl": "%s/pulse-arm64.apk",\n' "$BASE"
+            printf '      "sizeBytes": %s,\n' "$SIZE64"
+            printf '      "sha256": "%s"\n' "$SHA64"
+            printf '    },\n'
+            printf '    "arm32": {\n'
+            printf '      "apkUrl": "%s/pulse-armv7.apk",\n' "$BASE"
+            printf '      "sizeBytes": %s,\n' "$SIZE32"
+            printf '      "sha256": "%s"\n' "$SHA32"
+            printf '    }\n'
+            printf '  },\n'
             printf '  "notes": [\n'
             # The commit subject and up to three of its body lines, as real JSON
             # strings — the update page shows them verbatim.
@@ -212,9 +248,10 @@ jobs:
             printf '\n  ]\n'
             printf '}\n'
           } > latest.json
-          python3 -c "import json;json.load(open('latest.json'));print('manifest is valid JSON')"
-          echo "::notice::publishing $VERSION (build $RUN, $SIZE bytes, sha256 ${SHA:0:12}…)"
-          gh release create "build-$RUN" pulse.apk latest.json \
+
+          python3 -c "import json;d=json.load(open('latest.json'));print('manifest ok: build', d['versionCode'], 'arm64', d['abis']['arm64']['sizeBytes'], 'arm32', d['abis']['arm32']['sizeBytes'])"
+          echo "::notice::publishing $VERSION (build $RUN) — arm64 $SIZE64 bytes, armv7 $SIZE32 bytes"
+          gh release create "build-$RUN" pulse-arm64.apk pulse-armv7.apk latest.json \
             --title "Pulse $VERSION" \
-            --notes "Automatic build $RUN from \`${GITHUB_SHA::7}\`. Installed apps will offer this update on next launch." \
+            --notes "Build $RUN from ${GITHUB_SHA::7}. Installed apps will offer this update on next launch." \
             --latest
