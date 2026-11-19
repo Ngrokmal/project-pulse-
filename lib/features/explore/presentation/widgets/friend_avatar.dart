@@ -97,9 +97,13 @@ class FriendAvatar extends StatelessWidget {
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
+          // The sparks leave the avatar and travel past its edge, so the burst
+          // is drawn in a box 2.2x the avatar and centred on it. (A negative
+          // Padding — the obvious way to do this — asserts at layout time.)
           Positioned.fill(
-            child: Padding(
-              padding: EdgeInsets.all(-size * 0.6),
+            child: OverflowBox(
+              maxWidth: size * 2.2,
+              maxHeight: size * 2.2,
               child: SparkleBurst(controller: burst),
             ),
           ),

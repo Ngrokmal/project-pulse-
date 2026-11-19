@@ -124,9 +124,21 @@ class _ExploreSearchBarState extends State<ExploreSearchBar> {
                         color: ExplorePalette.ink,
                         height: 1.2,
                       ),
+                      // The app theme paints a focused TextField with a
+                      // purple 1.5 px OutlineInputBorder (and a filled
+                      // background). Inside this field that read as a second,
+                      // doubled ring hugging the hint — so every border state is
+                      // switched off here and the single accent is the one the
+                      // AnimatedContainer around it draws.
                       decoration: const InputDecoration(
                         isDense: true,
+                        filled: false,
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
                         hintText: 'Search people, @handle',
                         hintStyle: TextStyle(
