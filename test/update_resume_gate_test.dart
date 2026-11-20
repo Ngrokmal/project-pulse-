@@ -40,6 +40,7 @@ class _FakeInstaller implements ApkInstaller {
 AppUpdate _manifest(int code) => AppUpdate(
   versionName: '0.1.$code',
   versionCode: code,
+  channelBuild: code,
   variants: <String, UpdateVariant>{
     deviceAbiKey(): UpdateVariant(
       apkUrl: 'https://example.test/pulse.apk',
@@ -68,8 +69,11 @@ void main() {
         apkInstallerProvider.overrideWithValue(_FakeInstaller()),
         updateStoreProvider.overrideWith((ref) async => UpdateStore(temp)),
         installedBuildProvider.overrideWith(
-          (ref) async =>
-              const InstalledBuild(versionName: '0.1.41', versionCode: 41),
+          (ref) async => const InstalledBuild(
+            versionName: '0.1.41',
+            versionCode: 41,
+            channelBuild: 41,
+          ),
         ),
       ],
       child: MaterialApp.router(

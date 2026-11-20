@@ -47,6 +47,7 @@ class _Installer implements ApkInstaller {
 AppUpdate _manifest(int code) => AppUpdate(
   versionName: '0.1.$code',
   versionCode: code,
+  channelBuild: code,
   variants: <String, UpdateVariant>{
     deviceAbiKey(): UpdateVariant(
       apkUrl: 'https://example.test/pulse-${deviceAbiKey()}.apk',
@@ -74,6 +75,7 @@ void main() {
           (ref) async => InstalledBuild(
             versionName: '0.1.$installedCode',
             versionCode: installedCode,
+            channelBuild: installedCode,
           ),
         ),
       ],

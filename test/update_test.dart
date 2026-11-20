@@ -53,6 +53,7 @@ AppUpdate _manifest({required String sha, required int size, int code = 42}) {
   return AppUpdate(
     versionName: '0.1.$code',
     versionCode: code,
+    channelBuild: code,
     notes: const <String>['One thing changed'],
     variants: <String, UpdateVariant>{
       mine: UpdateVariant(
@@ -77,6 +78,7 @@ AppUpdate _flatManifest({
 }) => AppUpdate(
   versionName: '0.1.$code',
   versionCode: code,
+  channelBuild: code,
   variants: <String, UpdateVariant>{
     'universal': UpdateVariant(
       apkUrl: 'https://example.test/pulse.apk',
@@ -112,6 +114,7 @@ void main() {
           (ref) async => InstalledBuild(
             versionName: '0.1.$installedCode',
             versionCode: installedCode,
+            channelBuild: installedCode,
           ),
         ),
         if (client != null) updateHttpClientProvider.overrideWithValue(client),

@@ -167,20 +167,56 @@ String deviceAbiKey() {
   return 'arm64';
 }
 
+/// Recovers the build number out of a `versionCode` that Android's per-ABI
+/// split rule has rewritten.
+///
+/// `flutter build apk --split-per-abi` gives each slice
+/// `versionCode = ABI_INDEX * 1000 + build` (arm64 → 2000 + build, armv7 →
+/// 1000 + build, x86_64 → 4000 + build). So build 50 installs as 2050, and
+/// build 48 as 2048. A build from before splitting — or a universal APK — keeps
+/// the plain number.
+///
+/// This is the *fallback*: it only runs for copies that were installed before
+/// the build number was compiled in, and it is why the fix reaches phones that
+/// are already out there instead of only the next fresh install. It is written
+/// as one line of arithmetic that is true for both schemes, not as a special
+/// case per ABI.
+int channelBuildFromVersionCode(int versionCode) {
+  if (versionCode < 1000) return versionCode;
+  return versionCode % 1000;
+}
+
 class InstalledBuild {
-  const InstalledBuild({required this.versionName, required this.versionCode});
+  const InstalledBuild({
+    required this.versionName,
+    required this.versionCode,
+    required this.channelBuild,
+  });
 
   final String versionName;
+
+  /// Exactly what Android reports — split-ABI and all. Kept for the identity
+  /// check and for diagnostics, never for comparing releases.
   final int versionCode;
 
-  String get label => 'v$versionName ($versionCode)';
+  /// The build number this copy is: run number for CI builds.
+  final int channelBuild;
+
+  /// `v0.1.50 · build 50` — the same words the channel uses.
+  String get label => 'v$versionName · build $channelBuild';
 }
 
 final installedBuildProvider = FutureProvider<InstalledBuild>((ref) async {
   final info = await PackageInfo.fromPlatform();
+  final versionCode = int.tryParse(info.buildNumber) ?? 0;
+  // The compiled-in number wins when there is one: it cannot be misread.
+  final channelBuild = AppConfig.channelBuild > 0
+      ? AppConfig.channelBuild
+      : channelBuildFromVersionCode(versionCode);
   return InstalledBuild(
     versionName: info.version.isEmpty ? '0.0.0' : info.version,
-    versionCode: int.tryParse(info.buildNumber) ?? 0,
+    versionCode: versionCode,
+    channelBuild: channelBuild,
   );
 });
 
@@ -314,7 +350,16 @@ class UpdateController extends Notifier<UpdateState> {
     final latest = await _repository.latest();
     final canInstall = await _installer.canInstall();
 
-    if (latest == null || !latest.isNewerThan(build.versionCode)) {
+    // Compare build numbers, never raw version codes — and if the channel
+    // literally lists the file this phone is running, there is nothing to do
+    // even when the numbers are too close to call.
+    if (latest == null ||
+        !latest.isNewerThan(
+          build.channelBuild,
+          abi: deviceAbiKey(),
+          installedVersionCode: build.versionCode,
+        ) ||
+        latest.carriesVersionCode(build.versionCode)) {
       state = state.copyWith(
         phase: UpdatePhase.upToDate,
         canInstall: canInstall,
@@ -337,7 +382,7 @@ class UpdateController extends Notifier<UpdateState> {
 
     final store = await ref.read(updateStoreProvider.future);
     final reusable = await store.reusableApk(
-      versionCode: latest.versionCode,
+      versionCode: latest.channelBuild,
       abi: abi,
       sha256: variant.sha256,
       sizeBytes: variant.sizeBytes,
@@ -345,7 +390,7 @@ class UpdateController extends Notifier<UpdateState> {
     // A dismissal only ever applies to the build it was given for, and only
     // while this app session is alive.
     final skipped =
-        state.skipped && state.update?.versionCode == latest.versionCode;
+        state.skipped && state.update?.channelBuild == latest.channelBuild;
 
     state = UpdateState(
       phase: reusable == null ? UpdatePhase.available : UpdatePhase.ready,
@@ -373,7 +418,7 @@ class UpdateController extends Notifier<UpdateState> {
 
     final abi = deviceAbiKey();
     final store = await ref.read(updateStoreProvider.future);
-    final part = store.partFile(update.versionCode, abi);
+    final part = store.partFile(update.channelBuild, abi);
     if (part.existsSync()) part.deleteSync();
 
     state = state.copyWith(

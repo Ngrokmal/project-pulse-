@@ -30,6 +30,18 @@ class AppConfig {
       ? 'anon JWT'
       : 'unknown key';
 
+  /// The build this APK *is*, compiled in by CI from the same number that names
+  /// the release (`--dart-define=CHANNEL_BUILD=<run number>`).
+  ///
+  /// This exists because the `versionCode` Android reports is not that number:
+  /// a per-ABI split build rewrites it to `ABI_INDEX * 1000 + build`, so an
+  /// arm64 build 50 installs as 2050. Comparing the published build number
+  /// against 2050 is how every installed copy came to believe it was newer than
+  /// the channel and quietly never updated. The app now knows its own build
+  /// outright instead of inferring it. `0` means "not built by CI" — see
+  /// `InstalledBuild.channelBuild` for the fallback.
+  static const int channelBuild = int.fromEnvironment('CHANNEL_BUILD');
+
   /// Where the app finds out whether it is old.
   ///
   /// A GitHub Release asset, published by CI on every push to `main`: a tiny
