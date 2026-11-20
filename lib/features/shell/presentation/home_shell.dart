@@ -9,7 +9,6 @@ import '../../notifications/presentation/push_banner.dart';
 import '../../presence/application/presence_controller.dart';
 import '../../chat/presentation/chats_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
-import '../../update/presentation/widgets/update_resume_gate.dart';
 
 /// App shell with the reference bottom navigation: Home · Calls · Explore ·
 /// Profile, in that order.
@@ -47,25 +46,23 @@ class _HomeShellState extends ConsumerState<HomeShell> {
     // Keeps `user_presence` warm while the signed-in shell is on screen.
     ref.watch(presenceHeartbeatProvider);
     return Scaffold(
-      body: UpdateResumeGate(
-        child: AccountGate(
-          child: Column(
-            children: [
-              PushBanner(onOpenInbox: () => setState(() => _index = 0)),
-              Expanded(
-                child: IndexedStack(
-                  index: _index,
-                  children: [
-                    // Keep every tab warm, but only the visible one may animate:
-                    // an off-screen tab that keeps ticking is exactly how a phone
-                    // drops frames for a screen nobody is looking at.
-                    for (final (index, screen) in _screens.indexed)
-                      TickerMode(enabled: index == _index, child: screen),
-                  ],
-                ),
+      body: AccountGate(
+        child: Column(
+          children: [
+            PushBanner(onOpenInbox: () => setState(() => _index = 0)),
+            Expanded(
+              child: IndexedStack(
+                index: _index,
+                children: [
+                  // Keep every tab warm, but only the visible one may animate:
+                  // an off-screen tab that keeps ticking is exactly how a phone
+                  // drops frames for a screen nobody is looking at.
+                  for (final (index, screen) in _screens.indexed)
+                    TickerMode(enabled: index == _index, child: screen),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
