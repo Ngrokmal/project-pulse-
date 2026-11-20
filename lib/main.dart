@@ -9,6 +9,7 @@ import 'app/app.dart';
 import 'core/config/app_config.dart';
 import 'core/platform/firebase_bootstrap.dart';
 import 'features/chat/data/chat_local_store.dart';
+import 'features/profile/data/profile_local_store.dart';
 import 'core/logging/app_logger.dart';
 
 final _log = AppLogger('bootstrap');
@@ -32,6 +33,10 @@ Future<void> main() async {
       // Offline cache + outbox. Failing to open Hive degrades to online-only;
       // it must never stop the messenger from starting.
       await ChatLocalStore.open();
+
+      // The profile's cache + outbox, on the same terms: without this box the
+      // card cannot be read offline and a queued privacy switch is lost.
+      await ProfileLocalStore.open();
 
       if (AppConfig.isBackendConfigured) {
         try {

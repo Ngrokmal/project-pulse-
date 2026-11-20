@@ -9,6 +9,8 @@ import '../../../chat/application/chat_controller.dart';
 import '../../../chat/domain/chat_repository.dart';
 import '../../../chat/domain/conversation.dart';
 import '../../../presence/application/presence_controller.dart';
+import '../../../profile/application/safety_controller.dart';
+import '../../../profile/domain/safety_action.dart';
 import '../../../presence/domain/presence.dart';
 import '../../domain/inbox_motion.dart';
 import '../../domain/inbox_palette.dart';
@@ -236,6 +238,13 @@ class _PeerProfileSheetState extends ConsumerState<PeerProfileSheet> {
                         _ => '…',
                       },
                     ),
+                    if (peerId.isNotEmpty)
+                      _SafetyRow(
+                        peerId: peerId,
+                        givenName: conversation.displayName
+                            .split(RegExp(r'\s+'))
+                            .first,
+                      ),
                   ],
                 ),
               ),
@@ -599,4 +608,179 @@ class _ProfileArtPainter extends CustomPainter {
       oldDelegate.orbitA != orbitA ||
       oldDelegate.orbitB != orbitB ||
       oldDelegate.online != online;
+}
+
+/// Clear · Block · Report for a real person.
+///
+/// These are the same three actions the profile card's Safety lens shows, and
+/// they write for real: `cleared_at`, `public.blocks` (which the database then
+/// enforces on both directions), and a `reports` row. A group has no single
+/// person to block, so the row is never built for one.
+class _SafetyRow extends ConsumerWidget {
+  const _SafetyRow({required this.peerId, required this.givenName});
+
+  final String peerId;
+  final String givenName;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(safetyControllerProvider);
+    final busy = state.isBusy;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: Row(
+        children: [
+          _SafetyChip(
+            icon: Icons.delete_outline_rounded,
+            label: 'Clear chat',
+            enabled: !busy,
+            onTap: () => _confirm(context, ref, SafetyAction.clearChat),
+          ),
+          const SizedBox(width: 8),
+          _SafetyChip(
+            icon: Icons.block_rounded,
+            label: 'Block',
+            enabled: !busy,
+            onTap: () => _confirm(context, ref, SafetyAction.block),
+          ),
+          const SizedBox(width: 8),
+          _SafetyChip(
+            icon: Icons.flag_outlined,
+            label: busy && state.running == SafetyAction.report
+                ? 'Sending'
+                : 'Report',
+            enabled: !busy,
+            onTap: () => _report(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirm(
+    BuildContext context,
+    WidgetRef ref,
+    SafetyAction action,
+  ) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(action.titleFor(givenName)),
+        content: Text(action.body),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(action.confirmLabel),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    final failure = await ref
+        .read(safetyControllerProvider.notifier)
+        .run(action, targetUserId: peerId);
+    if (!context.mounted) return;
+    _say(
+      context,
+      failure == null ? action.doneLabel : failure.userMessage,
+    );
+    if (failure == null) Navigator.of(context).maybePop();
+  }
+
+  Future<void> _report(BuildContext context, WidgetRef ref) async {
+    final reason = await showDialog<ReportReason>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Why are you reporting this?'),
+        children: [
+          for (final reason in ReportReason.values)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(reason),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(reason.label),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+    final failure = await ref
+        .read(safetyControllerProvider.notifier)
+        .report(targetUserId: peerId, reason: reason);
+    if (!context.mounted) return;
+    _say(
+      context,
+      failure == null
+          ? SafetyAction.report.doneLabel
+          : failure.userMessage,
+    );
+  }
+
+  void _say(BuildContext context, String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+    );
+  }
+}
+
+class _SafetyChip extends StatelessWidget {
+  const _SafetyChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    required this.enabled,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: InboxPressable(
+        onTap: enabled ? onTap : null,
+        pressedScale: 0.96,
+        semanticLabel: label,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFF8F9),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(color: const Color(0xFFFBDDE1)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 14,
+                color: enabled ? AppColors.danger : InboxPalette.muted,
+              ),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: enabled ? AppColors.danger : InboxPalette.muted,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

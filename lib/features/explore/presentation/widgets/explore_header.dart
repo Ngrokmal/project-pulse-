@@ -4,6 +4,7 @@ import '../../domain/explore_motion.dart';
 import '../../domain/explore_palette.dart';
 import 'explore_pressable.dart';
 import 'explore_search_bar.dart';
+import 'explore_wordmark.dart';
 
 /// The three lines of the header, in the reference's order.
 ///
@@ -39,21 +40,7 @@ class ExploreHeader extends StatelessWidget {
         children: [
           Row(
             children: [
-              ShaderMask(
-                blendMode: BlendMode.srcIn,
-                shaderCallback: (rect) =>
-                    ExplorePalette.brand.createShader(rect),
-                child: const Text(
-                  'Explore',
-                  style: TextStyle(
-                    fontSize: 30,
-                    height: 1.05,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -1.1,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+              const ExploreWordmark(),
               const SizedBox(width: 10),
               if (pendingRequests > 0) _LivePill(count: pendingRequests),
               const Spacer(),

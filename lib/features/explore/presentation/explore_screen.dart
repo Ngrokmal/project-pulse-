@@ -10,6 +10,8 @@ import '../domain/explore_motion.dart';
 import '../domain/explore_palette.dart';
 import '../domain/explore_section.dart';
 import '../domain/friend_request.dart';
+import '../domain/person.dart';
+import 'explore_chat.dart';
 import 'widgets/explore_backdrop.dart';
 import 'widgets/explore_empty_state.dart';
 import 'widgets/explore_header.dart';
@@ -314,7 +316,7 @@ class _SentSection extends ConsumerWidget {
   }
 }
 
-class _FriendsSection extends ConsumerWidget {
+class _FriendsSection extends ConsumerStatefulWidget {
   const _FriendsSection({
     required this.justAdded,
     required this.onRefresh,
@@ -326,10 +328,33 @@ class _FriendsSection extends ConsumerWidget {
   final VoidCallback onFindPeople;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_FriendsSection> createState() => _FriendsSectionState();
+}
+
+class _FriendsSectionState extends ConsumerState<_FriendsSection> {
+  /// Who is being opened right now — one tap per person, never two requests.
+  final Set<String> _opening = <String>{};
+
+  Future<void> _open(Person person) async {
+    if (!_opening.add(person.id)) return;
+    setState(() {});
+    try {
+      await openExploreChat(context, ref, person);
+    } finally {
+      if (mounted) {
+        _opening.remove(person.id);
+        setState(() {});
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final friends = ref.watch(friendsProvider);
     final count = ref.watch(friendsCountProvider).value ?? 0;
-    final actions = ref.read(friendActionsProvider);
+    final justAdded = widget.justAdded;
+    final onRefresh = widget.onRefresh;
+    final onFindPeople = widget.onFindPeople;
 
     return friends.when(
       skipLoadingOnRefresh: true,
@@ -373,7 +398,10 @@ class _FriendsSection extends ConsumerWidget {
                 key: ValueKey<String>(person.id),
                 person: person,
                 isNew: justAdded.contains(person.id),
-                onMessage: () => actions.message(person),
+                busy: _opening.contains(person.id),
+                entranceDelay:
+                    ExploreMotion.rowStagger * ((index - 1).clamp(0, 6)),
+                onMessage: () => _open(person),
               );
             },
           ),
@@ -409,16 +437,40 @@ class _SectionHead extends ConsumerWidget {
       _ => null,
     };
 
+    final icon = switch (trailingKey) {
+      'requests' => Icons.person_add_alt_1_rounded,
+      'sent' => Icons.outbox_rounded,
+      _ => Icons.diversity_3_rounded,
+    };
+
     return Row(
       children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            gradient: ExplorePalette.brand,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: const <BoxShadow>[
+              BoxShadow(
+                color: Color(0x335F3FDC),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          alignment: Alignment.center,
+          child: Icon(icon, size: 13, color: Colors.white),
+        ),
+        const SizedBox(width: 9),
         Expanded(
           child: Text(
             heading,
             style: const TextStyle(
-              fontSize: 13.5,
+              fontSize: 14,
               height: 1.2,
               fontWeight: FontWeight.w900,
-              letterSpacing: -0.2,
+              letterSpacing: -0.3,
               color: ExplorePalette.ink,
             ),
           ),
@@ -426,13 +478,20 @@ class _SectionHead extends ConsumerWidget {
         if (trailing != null)
           trailing!
         else if (meta != null)
-          Text(
-            meta,
-            style: const TextStyle(
-              fontSize: 10.5,
-              height: 1.2,
-              fontWeight: FontWeight.w900,
-              color: ExplorePalette.brand700,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: ExplorePalette.brand500.withValues(alpha: 0.09),
+              borderRadius: BorderRadius.circular(ExploreMotion.pillRadius),
+            ),
+            child: Text(
+              meta,
+              style: const TextStyle(
+                fontSize: 10,
+                height: 1.1,
+                fontWeight: FontWeight.w900,
+                color: ExplorePalette.brand700,
+              ),
             ),
           ),
       ],

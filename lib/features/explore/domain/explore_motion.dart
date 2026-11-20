@@ -73,6 +73,13 @@ class ExploreMotion {
 
   // ----------------------------------------------------------------- search
   /// The sheet grows out of the field, then settles.
+  /// The honest presence dot breathes while it is green (2.4 s, reversed).
+  static const Duration liveDotPulse = Duration(milliseconds: 2400);
+
+  /// The header wordmark: one arrival, then a slow sheen across the letters.
+  static const Duration wordmarkEnter = Duration(milliseconds: 620);
+  static const Duration wordmarkSweep = Duration(milliseconds: 4200);
+
   static const Duration sheetOpen = Duration(milliseconds: 480);
   static const Duration sheetClose = Duration(milliseconds: 260);
   static const double sheetOriginFactor = 0.18;

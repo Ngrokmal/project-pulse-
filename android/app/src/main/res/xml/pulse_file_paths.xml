@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The only thing Pulse ever shares through its FileProvider is a downloaded
+  update: `filesDir/updates/pulse-<versionCode>.apk`. Nothing else in the app's
+  storage is exposed, and the URIs are granted one activity launch at a time.
+-->
+<paths>
+    <files-path name="updates" path="updates/" />
+</paths>

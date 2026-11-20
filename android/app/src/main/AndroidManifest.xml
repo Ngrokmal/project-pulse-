@@ -9,6 +9,10 @@
     <!-- Force Audio records from the microphone. Requested at runtime with a
          real explanation; refusing it only disables recording, nothing else. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- The app updates itself from its own GitHub release. Android 8+ requires
+         this permission *and* a per-app "install unknown apps" grant, which the
+         update page asks for explicitly before it hands over the APK. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <application
         android:label="Pulse"
@@ -36,6 +40,18 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- Hands the downloaded APK to the system installer as a content://
+             URI, so the file is never world-readable and no storage permission
+             is needed. Paths: res/xml/pulse_file_paths.xml. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/pulse_file_paths"/>
+        </provider>
         <!-- FCM delivers to this channel; MainActivity creates it before the
              first push can arrive so notifications are never silently dropped. -->
         <meta-data
