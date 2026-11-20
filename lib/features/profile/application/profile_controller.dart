@@ -101,7 +101,9 @@ class ProfileController extends AsyncNotifier<Profile?> {
     }
 
     final before = current;
-    state = AsyncData(current.copyWith(privacy: current.privacy.withValue(field, value)));
+    state = AsyncData(
+      current.copyWith(privacy: current.privacy.withValue(field, value)),
+    );
     try {
       final saved = await ref
           .read(profileRepositoryProvider)

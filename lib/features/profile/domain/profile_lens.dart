@@ -13,8 +13,7 @@ enum ProfileLens {
     ProfileLens.story => 'Story',
     ProfileLens.people => 'People',
     ProfileLens.media => 'Media',
-    ProfileLens.settings =>
-      mode.isVisitor ? 'Safety' : 'Settings',
+    ProfileLens.settings => mode.isVisitor ? 'Safety' : 'Settings',
   };
 
   static ProfileLens parse(String? raw) => switch (raw) {

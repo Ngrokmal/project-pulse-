@@ -231,8 +231,7 @@ class _Sheen extends StatefulWidget {
   State<_Sheen> createState() => _SheenState();
 }
 
-class _SheenState extends State<_Sheen>
-    with SingleTickerProviderStateMixin {
+class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
   late final AnimationController _controller = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 5800),
@@ -284,11 +283,7 @@ class _SheenState extends State<_Sheen>
 }
 
 class _GhostCta extends StatelessWidget {
-  const _GhostCta({
-    required this.icon,
-    required this.onTap,
-    required this.tip,
-  });
+  const _GhostCta({required this.icon, required this.onTap, required this.tip});
 
   final IconData icon;
   final VoidCallback onTap;

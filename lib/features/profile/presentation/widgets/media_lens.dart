@@ -84,7 +84,11 @@ class _Mosaic extends StatelessWidget {
               SizedBox(
                 width: index == 0 ? constraints.maxWidth : cell,
                 height: index == 0 ? cell * 0.86 : cell * 0.72,
-                child: _Tile(item: item, onTap: () => onOpen(item), wide: index == 0),
+                child: _Tile(
+                  item: item,
+                  onTap: () => onOpen(item),
+                  wide: index == 0,
+                ),
               ),
           ],
         );
@@ -194,11 +198,7 @@ class _Wash extends StatelessWidget {
         ),
       ),
       child: const Center(
-        child: Icon(
-          Icons.image_outlined,
-          size: 22,
-          color: Color(0x66FFFFFF),
-        ),
+        child: Icon(Icons.image_outlined, size: 22, color: Color(0x66FFFFFF)),
       ),
     );
   }

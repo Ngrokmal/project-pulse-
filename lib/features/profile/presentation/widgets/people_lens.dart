@@ -154,17 +154,23 @@ class _FaceStack extends StatelessWidget {
       );
     }
     final shown = faces.take(4).toList(growable: false);
+    const step = 21.0;
+    const diameter = 40.0;
     return SizedBox(
-      width: 44 + (shown.length - 1) * 17,
-      height: 44,
+      // The stack must be as wide as its last face, or the earlier ones get
+      // clipped by the Row that holds it.
+      width: diameter + (shown.length - 1) * step,
+      height: diameter,
       child: Stack(
+        clipBehavior: Clip.none,
         children: [
-          for (final (index, face) in shown.reversed.indexed)
+          // Painted left to right, so the first face ends up on top.
+          for (final (index, face) in shown.indexed)
             Positioned(
-              left: (shown.length - 1 - index) * 17,
+              left: index * step,
               child: Container(
-                width: 40,
-                height: 40,
+                width: diameter,
+                height: diameter,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,

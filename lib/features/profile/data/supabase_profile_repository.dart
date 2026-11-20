@@ -239,7 +239,10 @@ class SupabaseProfileRepository implements ProfileRepository {
           'One of these lines is longer than the card allows.',
         ),
         // 42501 insufficient privilege → RLS said no
-        '42501' => const ServerFailure(statusCode: 403, safeCode: 'not_allowed'),
+        '42501' => const ServerFailure(
+          statusCode: 403,
+          safeCode: 'not_allowed',
+        ),
         // PGRST205 table not found → migrations not applied yet
         'PGRST205' => const ServerFailure(safeCode: 'schema_missing'),
         _ => ServerFailure(safeCode: e.code ?? 'postgrest_error'),

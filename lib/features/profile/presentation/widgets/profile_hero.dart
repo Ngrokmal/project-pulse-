@@ -73,7 +73,7 @@ class _ProfileHeroState extends State<ProfileHero>
       width: double.infinity,
       padding: EdgeInsets.only(
         top: topInset + ProfileHero.appBarInset,
-        bottom: 74,
+        bottom: 54,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -141,9 +141,7 @@ class _Bloom extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, color.withValues(alpha: 0)],
-        ),
+        gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)]),
       ),
     ),
   );
@@ -208,8 +206,8 @@ class _Orb extends StatelessWidget {
             ),
             // The dark gap that makes the ring read as a ring.
             Container(
-              width: _size + 8,
-              height: _size + 8,
+              width: _size + 4,
+              height: _size + 4,
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.navy900,
@@ -229,7 +227,11 @@ class _Orb extends StatelessWidget {
 }
 
 class _Face extends StatelessWidget {
-  const _Face({required this.initials, required this.avatarUrl, required this.size});
+  const _Face({
+    required this.initials,
+    required this.avatarUrl,
+    required this.size,
+  });
 
   final String initials;
   final String? avatarUrl;
@@ -338,13 +340,10 @@ class HeroSeam extends StatelessWidget {
   Widget build(BuildContext context) => ClipRect(
     child: BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 0.01, sigmaY: 0.01),
-      child: Container(
-        height: 1,
-        color: Colors.white.withValues(alpha: 0.16),
-      ),
+      child: Container(height: 1, color: Colors.white.withValues(alpha: 0.16)),
     ),
   );
 }
 
 /// The hero's own vertical rhythm, so the screen can reserve it exactly.
-const double profileHeroMinHeight = 168 + ProfileHero.appBarInset + 74;
+const double profileHeroMinHeight = 168 + ProfileHero.appBarInset + 54;

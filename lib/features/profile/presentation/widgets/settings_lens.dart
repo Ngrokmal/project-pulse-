@@ -122,8 +122,10 @@ class SettingsLens extends StatelessWidget {
                   value: privacy.notifications,
                   onChanged: (v) => onToggle(PrivacyField.notifications, v),
                 ),
-                onTap: () =>
-                    onToggle(PrivacyField.notifications, !privacy.notifications),
+                onTap: () => onToggle(
+                  PrivacyField.notifications,
+                  !privacy.notifications,
+                ),
               ),
               PulseRow(
                 icon: Icons.ios_share_rounded,

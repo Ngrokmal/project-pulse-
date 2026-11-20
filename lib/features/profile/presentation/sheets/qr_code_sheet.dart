@@ -12,7 +12,11 @@ import 'pulse_sheet.dart';
 /// The encoder is `qr_flutter`, so what a camera reads here is the actual
 /// `pulse.app/@handle` string — not a decorative square.
 class QrCodeSheet extends StatelessWidget {
-  const QrCodeSheet({super.key, required this.profile, required this.onCopyLink});
+  const QrCodeSheet({
+    super.key,
+    required this.profile,
+    required this.onCopyLink,
+  });
 
   final Profile profile;
   final VoidCallback onCopyLink;

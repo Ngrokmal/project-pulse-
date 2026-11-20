@@ -73,10 +73,7 @@ void main() {
         profile: full.copyWith(whereText: '   '),
         now: DateTime.utc(2026, 11, 14, 12),
       );
-      expect(
-        board.entries.any((e) => e.kind == RightNowKind.where),
-        isFalse,
-      );
+      expect(board.entries.any((e) => e.kind == RightNowKind.where), isFalse);
     });
 
     test('an empty status hides its tile too', () {
@@ -102,14 +99,20 @@ void main() {
         (e) => e.kind == RightNowKind.where,
       );
       expect(where.sourceFor(ProfileViewMode.owner), contains('You typed'));
-      expect(where.sourceFor(ProfileViewMode.visitor), contains('Typed by them'));
+      expect(
+        where.sourceFor(ProfileViewMode.visitor),
+        contains('Typed by them'),
+      );
     });
   });
 
   group('the clock on the card', () {
     test('renders in the profile zone, not the reader zone', () {
       const time = ProfileTime(offsetMinutes: -300, label: 'New York');
-      expect(time.displayAt(DateTime.utc(2026, 11, 14, 23, 30)), '6:30 PM · New York');
+      expect(
+        time.displayAt(DateTime.utc(2026, 11, 14, 23, 30)),
+        '6:30 PM · New York',
+      );
       expect(time.offsetLabel, 'UTC-05:00');
     });
 

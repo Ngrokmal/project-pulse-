@@ -16,11 +16,7 @@ class ProfileFooter extends StatelessWidget {
           height: 1,
           decoration: const BoxDecoration(
             gradient: LinearGradient(
-              colors: [
-                Color(0x00ECEAF4),
-                AppColors.border,
-                Color(0x00ECEAF4),
-              ],
+              colors: [Color(0x00ECEAF4), AppColors.border, Color(0x00ECEAF4)],
             ),
           ),
         ),

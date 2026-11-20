@@ -53,9 +53,7 @@ class _Hairline extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     height: 1,
     decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [AppColors.border, Color(0x00ECEAF4)],
-      ),
+      gradient: LinearGradient(colors: [AppColors.border, Color(0x00ECEAF4)]),
     ),
   );
 }
@@ -83,41 +81,54 @@ class PulseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(radius);
-    final body = Container(
-      padding: padding,
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: AppRadius.cardRadius,
-        border: gradientHairline ? null : Border.all(color: AppColors.border),
-        boxShadow: AppShadows.card,
-      ),
-      foregroundDecoration: gradientHairline
-          ? BoxDecoration(
-              borderRadius: AppRadius.cardRadius,
-              border: Border.all(color: Colors.transparent),
-              gradient: const LinearGradient(
+
+    // A gradient hairline is a gradient *border*, and Flutter has no such
+    // decoration — so the gradient is the background and a white card sits on
+    // top of it, one hairline smaller. Painting it as a foregroundDecoration
+    // would wash the whole card in colour instead of outlining it.
+    final Widget body = gradientHairline
+        ? DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
                 colors: [
-                  AppColors.brand300,
-                  AppColors.blue300,
+                  AppColors.brand200,
+                  AppColors.blue100,
                   AppColors.brand200,
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-            )
-          : null,
-      child: child,
-    );
+              borderRadius: AppRadius.cardRadius,
+              boxShadow: AppShadows.card,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(1.2),
+              child: Container(
+                padding: padding,
+                decoration: const BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: AppRadius.cardRadius,
+                ),
+                child: child,
+              ),
+            ),
+          )
+        : Container(
+            padding: padding,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppRadius.cardRadius,
+              border: Border.all(color: AppColors.border),
+              boxShadow: AppShadows.card,
+            ),
+            child: child,
+          );
 
     if (onTap == null) return body;
     return Material(
       color: Colors.transparent,
       borderRadius: borderRadius,
-      child: InkWell(
-        borderRadius: borderRadius,
-        onTap: onTap,
-        child: body,
-      ),
+      child: InkWell(borderRadius: borderRadius, onTap: onTap, child: body),
     );
   }
 }

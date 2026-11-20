@@ -93,5 +93,4 @@ class UpdateStore {
       entity.deleteSync();
     }
   }
-
 }

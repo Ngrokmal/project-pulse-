@@ -94,6 +94,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.bg,
       body: Stack(
+        // A Stack sizes to its non-positioned children — with the bar as the
+        // only one, the page below would be clipped to the bar's height.
+        fit: StackFit.expand,
         children: [
           Positioned.fill(
             child: profileState.isLoading && profile == null
@@ -104,8 +107,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       failure: profileState.error is AppFailure
                           ? profileState.error! as AppFailure
                           : const ServerFailure(),
-                      onRetry: () =>
-                          ref.read(profileControllerProvider.notifier).refresh(),
+                      onRetry: () => ref
+                          .read(profileControllerProvider.notifier)
+                          .refresh(),
                     ),
                   )
                 : profile == null
@@ -116,13 +120,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   )
                 : _buildCard(profile, view),
           ),
-          ProfileAppBar(
-            scrolled: _scrolled,
-            mode: view.mode,
-            onBack: () => context.go('/app'),
-            onMode: ref.read(profileViewProvider.notifier).setMode,
-            onCode: () => _openCode(),
-            onMore: () => _openMore(),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: ProfileAppBar(
+              scrolled: _scrolled,
+              mode: view.mode,
+              onBack: () => context.go('/app'),
+              onMode: ref.read(profileViewProvider.notifier).setMode,
+              onCode: () => _openCode(),
+              onMore: () => _openMore(),
+            ),
           ),
         ],
       ),
@@ -253,9 +262,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             PeopleFace(initials: person.initials, tone: index),
         ];
         final circles = <PeopleCircle>[
-          for (final conversation in conversations
-              .where((c) => c.isGroup)
-              .take(3))
+          for (final conversation
+              in conversations.where((c) => c.isGroup).take(3))
             PeopleCircle(
               title: conversation.displayName,
               subtitle: conversation.memberCount == 1
@@ -414,11 +422,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Future<void> _confirmDanger(
-    String title,
-    String body,
-    String confirm,
-  ) async {
+  Future<void> _confirmDanger(String title, String body, String confirm) async {
     final ok = await showPulseSheet<bool>(
       context: context,
       child: ConfirmSheet(title: title, body: body, confirmLabel: confirm),
@@ -500,7 +504,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       context: context,
       child: const ConfirmSheet(
         title: 'Log out?',
-        body: 'This phone forgets the session. Your card and your chats stay '
+        body:
+            'This phone forgets the session. Your card and your chats stay '
             'exactly as they are.',
         confirmLabel: 'Log out',
       ),

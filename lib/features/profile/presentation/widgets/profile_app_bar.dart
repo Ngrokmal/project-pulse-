@@ -34,11 +34,11 @@ class ProfileAppBar extends StatelessWidget {
     return AnimatedContainer(
       duration: AppMotion.base,
       curve: AppMotion.curve,
-      padding: EdgeInsets.only(
-        top: MediaQuery.paddingOf(context).top,
-      ),
+      padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top),
       decoration: BoxDecoration(
-        color: scrolled ? AppColors.bg.withValues(alpha: 0.94) : Colors.transparent,
+        color: scrolled
+            ? AppColors.bg.withValues(alpha: 0.94)
+            : Colors.transparent,
         border: Border(
           bottom: BorderSide(
             color: scrolled ? AppColors.border : Colors.transparent,
@@ -96,7 +96,11 @@ class ProfileAppBar extends StatelessWidget {
 /// You · Visitor. A preview switch, not a permission — it shows the card the way
 /// somebody else would see it.
 class _ViewPill extends StatelessWidget {
-  const _ViewPill({required this.mode, required this.onMode, required this.light});
+  const _ViewPill({
+    required this.mode,
+    required this.onMode,
+    required this.light,
+  });
 
   final ProfileViewMode mode;
   final ValueChanged<ProfileViewMode> onMode;

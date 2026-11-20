@@ -260,31 +260,36 @@ void main() {
       expect(container.read(updateControllerProvider).shouldPrompt, isFalse);
     });
 
-    test('“later” is quiet for this launch only — the next launch asks again',
-        () async {
-      final store = UpdateStore(temp);
-      final repo = _FakeRepo(_manifest(sha: 'f' * 64, size: 4096));
+    test(
+      '“later” is quiet for this launch only — the next launch asks again',
+      () async {
+        final store = UpdateStore(temp);
+        final repo = _FakeRepo(_manifest(sha: 'f' * 64, size: 4096));
 
-      final first = containerWith(
-        repository: repo,
-        installer: _FakeInstaller(),
-        store: store,
-      );
-      await first.read(updateControllerProvider.notifier).checkAtBoot();
-      await first.read(updateControllerProvider.notifier).remindLater();
-      expect(first.read(updateControllerProvider).shouldPrompt, isFalse);
+        final first = containerWith(
+          repository: repo,
+          installer: _FakeInstaller(),
+          store: store,
+        );
+        await first.read(updateControllerProvider.notifier).checkAtBoot();
+        await first.read(updateControllerProvider.notifier).remindLater();
+        expect(first.read(updateControllerProvider).shouldPrompt, isFalse);
 
-      // A new container over the same files is what a restart looks like: the
-      // dismissal must not have survived it.
-      final second = containerWith(
-        repository: repo,
-        installer: _FakeInstaller(),
-        store: store,
-      );
-      await second.read(updateControllerProvider.notifier).checkAtBoot();
-      expect(second.read(updateControllerProvider).phase, UpdatePhase.available);
-      expect(second.read(updateControllerProvider).shouldPrompt, isTrue);
-    });
+        // A new container over the same files is what a restart looks like: the
+        // dismissal must not have survived it.
+        final second = containerWith(
+          repository: repo,
+          installer: _FakeInstaller(),
+          store: store,
+        );
+        await second.read(updateControllerProvider.notifier).checkAtBoot();
+        expect(
+          second.read(updateControllerProvider).phase,
+          UpdatePhase.available,
+        );
+        expect(second.read(updateControllerProvider).shouldPrompt, isTrue);
+      },
+    );
 
     test('coming back to the app re-arms a dismissed prompt', () async {
       final container = containerWith(

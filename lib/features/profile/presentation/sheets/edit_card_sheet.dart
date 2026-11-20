@@ -224,8 +224,9 @@ class _Field extends StatelessWidget {
             minLines: lines,
             autocorrect: autocorrect,
             enableSuggestions: autocorrect,
-            textCapitalization:
-                autocorrect ? TextCapitalization.sentences : TextCapitalization.none,
+            textCapitalization: autocorrect
+                ? TextCapitalization.sentences
+                : TextCapitalization.none,
             style: AppTypography.bodyMedium.copyWith(
               fontSize: 14.5,
               color: AppColors.textPrimary,
