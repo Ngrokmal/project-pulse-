@@ -111,7 +111,7 @@ class UpdateStore {
       throw const UpdateFailure(
         'file_missing',
         'The download finished but Pulse could not find the file it had just '
-        'written. Tap Download update — the next attempt saves it again.',
+            'written. Tap Download update — the next attempt saves it again.',
       );
     }
     if (sizeBytes != null && part.lengthSync() != sizeBytes) {
@@ -120,7 +120,7 @@ class UpdateStore {
       throw const UpdateFailure(
         'file_truncated',
         'The file was saved short of its full size, so it was thrown away. '
-        'Tap Download update to fetch it again.',
+            'Tap Download update to fetch it again.',
       );
     }
 
@@ -132,7 +132,7 @@ class UpdateStore {
         throw const UpdateFailure(
           'file_move_failed',
           'The file could not be put where Android expects it. Tap Download '
-          'update to try once more.',
+              'update to try once more.',
         );
       }
       _stampFile(build, abi).writeAsStringSync(sha256.toLowerCase());
@@ -144,7 +144,7 @@ class UpdateStore {
       throw const UpdateFailure(
         'file_save_failed',
         'Pulse could not save the update on this phone. Free up some space and '
-        'tap Download update again.',
+            'tap Download update again.',
       );
     }
   }
