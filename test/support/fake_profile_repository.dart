@@ -1,6 +1,8 @@
 import 'package:pulse/core/error/app_failure.dart';
 import 'package:pulse/features/profile/domain/blocked_person.dart';
+import 'package:pulse/features/profile/domain/profile.dart';
 import 'package:pulse/features/profile/domain/profile_repository.dart';
+import 'package:pulse/features/profile/domain/profile_visitor.dart';
 
 /// A profile repository that answers only what a test asks it to.
 ///
@@ -8,9 +10,45 @@ import 'package:pulse/features/profile/domain/profile_repository.dart';
 /// [ProfileRepository] never silently breaks a test with a wrong default — the
 /// test that needs it fails loudly instead.
 class FakeProfileRepository implements ProfileRepository {
-  FakeProfileRepository({this.blocked = const <BlockedPerson>[]});
+  FakeProfileRepository({
+    this.blocked = const <BlockedPerson>[],
+    this.visitors = const <ProfileVisitor>[],
+    this.peer,
+    this.failVisitors = false,
+    this.failVisit = false,
+  });
 
   List<BlockedPerson> blocked;
+  List<ProfileVisitor> visitors;
+
+  /// The card `/u/:id` should open.
+  Profile? peer;
+
+  bool failVisitors;
+  bool failVisit;
+
+  /// Every visit this fake was asked to record, in order.
+  final List<String> recordedVisits = <String>[];
+
+  @override
+  Future<List<ProfileVisitor>> profileVisitors({int limit = 50}) async {
+    if (failVisitors) throw const ServerFailure();
+    return visitors;
+  }
+
+  @override
+  Future<void> recordProfileVisit(String targetUserId) async {
+    if (failVisit) throw const ServerFailure();
+    recordedVisits.add(targetUserId);
+  }
+
+  @override
+  Future<Profile> fetchProfile(String userId) async {
+    final card = peer;
+    if (card == null) throw const ServerFailure(safeCode: 'profile_missing');
+    return card;
+  }
+
   String? unblockedId;
   bool failUnblock = false;
   int blockCalls = 0;

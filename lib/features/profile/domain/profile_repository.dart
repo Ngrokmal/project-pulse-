@@ -4,6 +4,7 @@ import 'account_session.dart';
 import 'blocked_person.dart';
 import 'profile.dart';
 import 'profile_media.dart';
+import 'profile_visitor.dart';
 import 'profile_privacy.dart';
 import 'safety_action.dart';
 
@@ -11,6 +12,12 @@ import 'safety_action.dart';
 abstract class ProfileRepository {
   /// Throws typed AppFailure on error; never returns a fabricated profile.
   Future<Profile> fetchMyProfile(String userId);
+
+  /// Somebody else's card, read exactly as the server is willing to give it.
+  ///
+  /// A missing profile is [ServerFailure], never an empty card: a visitor page
+  /// that quietly invents a person is worse than one that says it could not.
+  Future<Profile> fetchProfile(String userId);
 
   /// Writes the whole card in one round trip.
   ///
@@ -83,6 +90,17 @@ abstract class ProfileRepository {
     required String targetUserId,
     required ReportReason reason,
   });
+
+  // ──────────────────────────────────────────────────────── profile views
+
+  /// Records that this account opened [targetUserId]'s card (0015).
+  ///
+  /// Best effort by design: a card must open even if the server is busy, so the
+  /// caller ignores a failure rather than showing it.
+  Future<void> recordProfileVisit(String targetUserId);
+
+  /// Who opened this account's card, newest first.
+  Future<List<ProfileVisitor>> profileVisitors({int limit});
 
   /// Clears the direct conversation with [otherUserId] for this account only.
   /// Silent when there is no conversation yet — clearing nothing is not an

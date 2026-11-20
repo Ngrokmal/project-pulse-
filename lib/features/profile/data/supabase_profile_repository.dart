@@ -11,6 +11,7 @@ import '../domain/profile_media.dart';
 import '../domain/profile_photo.dart';
 import '../domain/profile_privacy.dart';
 import '../domain/profile_repository.dart';
+import '../domain/profile_visitor.dart';
 import '../domain/safety_action.dart';
 
 class SupabaseProfileRepository implements ProfileRepository {
@@ -46,6 +47,26 @@ class SupabaseProfileRepository implements ProfileRepository {
       rethrow;
     } catch (e) {
       throw _map(e, 'fetch_my_profile');
+    }
+  }
+
+  @override
+  Future<Profile> fetchProfile(String userId) async {
+    try {
+      final data = await _selectProfile(userId);
+      if (data == null) {
+        throw const ServerFailure(safeCode: 'profile_missing');
+      }
+      final profile = Profile.fromMap(data);
+      // The card is rendered as a visitor sees it: a photo switched off is not
+      // delivered, even though the row still carries the URL.
+      return profile.privacy.photoVisible
+          ? profile
+          : Profile.fromMap(<String, dynamic>{...data, 'avatar_url': null});
+    } on AppFailure {
+      rethrow;
+    } catch (e) {
+      throw _map(e, 'fetch_profile');
     }
   }
 
@@ -398,6 +419,42 @@ class SupabaseProfileRepository implements ProfileRepository {
       rethrow;
     } catch (e) {
       throw _map(e, 'blocked_people');
+    }
+  }
+
+  @override
+  Future<void> recordProfileVisit(String targetUserId) async {
+    if (_client.auth.currentUser == null) return;
+    try {
+      await _client.rpc<dynamic>(
+        'record_profile_visit',
+        params: <String, dynamic>{'target': targetUserId},
+      );
+    } on AppFailure {
+      rethrow;
+    } catch (e) {
+      throw _map(e, 'record_profile_visit');
+    }
+  }
+
+  @override
+  Future<List<ProfileVisitor>> profileVisitors({int limit = 50}) async {
+    if (_client.auth.currentUser == null) return const <ProfileVisitor>[];
+    try {
+      final rows = await _client.rpc<dynamic>(
+        'profile_visitors',
+        params: <String, dynamic>{'limit_count': limit},
+      );
+      final list = rows is List ? rows : const <dynamic>[];
+      return [
+        for (final row in list)
+          if (row is Map)
+            ProfileVisitor.fromMap(Map<String, dynamic>.from(row)),
+      ];
+    } on AppFailure {
+      rethrow;
+    } catch (e) {
+      throw _map(e, 'profile_visitors');
     }
   }
 
