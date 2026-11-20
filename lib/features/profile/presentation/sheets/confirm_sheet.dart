@@ -69,3 +69,24 @@ class ConfirmSheet extends StatelessWidget {
     );
   }
 }
+
+/// Asks the one question, in the standard sheet, and answers `true` only when
+/// the person pressed the destructive button.
+///
+/// Every "are you sure" in the app goes through here so the shape, the weight of
+/// the words and the way out ("Keep it") can never drift apart between screens.
+Future<bool?> showPulseConfirm({
+  required BuildContext context,
+  required String title,
+  required String message,
+  required String confirmLabel,
+}) {
+  return showPulseSheet<bool>(
+    context: context,
+    child: ConfirmSheet(
+      title: title,
+      body: message,
+      confirmLabel: confirmLabel,
+    ),
+  );
+}

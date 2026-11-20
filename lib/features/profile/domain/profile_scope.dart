@@ -12,6 +12,7 @@ enum ProfileAction {
   showCode('Show code', ProfileViewMode.owner),
   copyHandle('Copy handle', ProfileViewMode.owner),
   whoSeesWhat('Who sees what', ProfileViewMode.owner),
+  profileViews('Profile views', ProfileViewMode.owner),
   devices('Devices & sessions', ProfileViewMode.owner),
   message('Message', ProfileViewMode.visitor),
   call('Call', ProfileViewMode.visitor),
@@ -66,6 +67,7 @@ abstract final class ProfileScopePlan {
           ProfileAction.shareLink,
           ProfileAction.showCode,
           ProfileAction.whoSeesWhat,
+          ProfileAction.profileViews,
           ProfileAction.devices,
         ];
 

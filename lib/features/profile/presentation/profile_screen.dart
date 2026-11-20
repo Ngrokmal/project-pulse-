@@ -30,6 +30,7 @@ import '../domain/profile_scope.dart';
 import '../domain/right_now.dart';
 import '../domain/safety_action.dart';
 import 'sheets/confirm_sheet.dart';
+import 'sheets/devices_sheet.dart';
 import 'sheets/edit_card_sheet.dart';
 import 'sheets/more_with_sheet.dart';
 import 'sheets/profile_photo_sheet.dart';
@@ -385,6 +386,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  /// Devices & sessions used to only exist *inside* the Settings lens; the
+  /// "…" row that promised it did nothing at all. One sheet serves both now.
+  Future<void> _openDevices() => showDevicesSheet(context);
+
   Future<void> _openMore() async {
     final profile = _profile;
     if (profile == null) return;
@@ -410,10 +415,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       title: title,
       subtitle: subtitle,
       danger: action.isDestructive,
-      onTap: () {
-        Navigator.of(context).pop();
-        _handleAction(action);
-      },
+      // The sheet closes itself (see MoreWithSheet); popping again here is how
+      // the whole page used to disappear and every row looked dead.
+      onTap: () => _handleAction(action),
     );
   }
 
@@ -443,6 +447,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           Icons.visibility_outlined,
           'Who sees what',
           'Every switch here writes to the server',
+        ),
+        ProfileAction.profileViews => (
+          Icons.insights_rounded,
+          'Profile views',
+          'Who opened your card, and when',
         ),
         ProfileAction.devices => (
           Icons.devices_outlined,
@@ -515,8 +524,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       case ProfileAction.copyHandle:
         await _copyHandle();
       case ProfileAction.whoSeesWhat:
-      case ProfileAction.devices:
+        // The switches live in the Settings lens of this very page.
         ref.read(profileViewProvider.notifier).setLens(ProfileLens.settings);
+        if (_scroll.hasClients) {
+          _scroll.animateTo(
+            0,
+            duration: AppMotion.base,
+            curve: AppMotion.curve,
+          );
+        }
+      case ProfileAction.profileViews:
+        await context.push<void>('/profile/views');
+      case ProfileAction.devices:
+        await _openDevices();
       case ProfileAction.message:
       case ProfileAction.call:
       case ProfileAction.video:

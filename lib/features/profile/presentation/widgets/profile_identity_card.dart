@@ -119,6 +119,7 @@ class ProfileIdentityCard extends StatelessWidget {
     ProfileAction.copyHandle => Icons.copy_rounded,
     ProfileAction.editCard => Icons.edit_outlined,
     ProfileAction.whoSeesWhat => Icons.visibility_outlined,
+    ProfileAction.profileViews => Icons.insights_rounded,
     ProfileAction.devices => Icons.devices_outlined,
     ProfileAction.clearChat => Icons.delete_outline_rounded,
     ProfileAction.block => Icons.block_rounded,

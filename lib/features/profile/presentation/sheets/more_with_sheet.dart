@@ -19,6 +19,10 @@ class SheetAction {
   final IconData icon;
   final String title;
   final String subtitle;
+
+  /// Runs *after* the sheet has closed. The sheet closes itself; a row must not
+  /// pop again — doing that twice is what used to throw the whole page away and
+  /// make every row here look broken.
   final VoidCallback onTap;
   final bool danger;
 }
@@ -52,8 +56,13 @@ class MoreWithSheet extends StatelessWidget {
               child: InkWell(
                 borderRadius: AppRadius.cardRadius,
                 onTap: () {
+                  // Pop first so the action's own sheet is the next thing to
+                  // rise, then run it on the next frame — a callback that opens
+                  // a sheet in the same frame as a pop loses its route.
                   Navigator.of(context).pop();
-                  action.onTap();
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => action.onTap(),
+                  );
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(

@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/theme/app_spacing.dart';
@@ -325,6 +326,14 @@ class _ResultsView extends ConsumerWidget {
   /// Close the sheet, then push the conversation: the sheet is a layer, not a
   /// place, and leaving it open behind the inbox would make Back go to a stale
   /// search.
+  /// The other door on a result: their card, as a visitor sees it. The sheet
+  /// closes first, exactly like opening a chat does, so Back lands on Explore.
+  void _openProfileWith(BuildContext context, Person person) {
+    final router = GoRouter.of(context);
+    Navigator.of(context).pop();
+    router.push<void>('/u/${person.id}');
+  }
+
   Future<void> _openChatWith(
     BuildContext context,
     WidgetRef ref,
@@ -415,6 +424,7 @@ class _ResultsView extends ConsumerWidget {
                 hit: hit,
                 actions: actions,
                 onOpenChat: () => _openChatWith(context, ref, hit.person),
+                onOpenProfile: () => _openProfileWith(context, hit.person),
                 entranceDelay: ExploreMotion.rowStagger * (index.clamp(0, 6)),
               );
             },

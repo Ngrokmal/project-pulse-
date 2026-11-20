@@ -24,6 +24,7 @@ class SearchResultTile extends StatefulWidget {
     required this.hit,
     required this.actions,
     required this.onOpenChat,
+    required this.onOpenProfile,
     this.entranceDelay = Duration.zero,
   });
 
@@ -32,6 +33,11 @@ class SearchResultTile extends StatefulWidget {
 
   /// Opens the real 1:1 conversation (the sheet closes first).
   final VoidCallback onOpenChat;
+
+  /// Opens their card — the visitor page — when the face or the name is tapped.
+  /// A person is a person before they are a thread, so the row has two doors and
+  /// they lead somewhere different on purpose.
+  final VoidCallback onOpenProfile;
   final Duration entranceDelay;
 
   @override
@@ -106,61 +112,75 @@ class _SearchResultTileState extends State<SearchResultTile> {
         padding: const EdgeInsets.fromLTRB(11, 11, 11, 11),
         child: Row(
           children: [
-            FriendAvatar(
-              person: _person,
-              size: 42,
-              sparkles: _sparkles,
-              ring: _state == FriendState.friend
-                  ? FriendAvatarRing.friend
-                  : FriendAvatarRing.none,
+            // The face is its own target: the name and the picture open the
+            // card, the pill on the right opens the chat. Nothing overlaps.
+            Semantics(
+              button: true,
+              label: 'Open ${_person.displayName}\'s card',
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onOpenProfile,
+                child: FriendAvatar(
+                  person: _person,
+                  size: 42,
+                  sparkles: _sparkles,
+                  ring: _state == FriendState.friend
+                      ? FriendAvatarRing.friend
+                      : FriendAvatarRing.none,
+                ),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          _person.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 13.5,
-                            height: 1.15,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.1,
-                            color: ExplorePalette.ink,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onOpenProfile,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            _person.displayName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13.5,
+                              height: 1.15,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.1,
+                              color: ExplorePalette.ink,
+                            ),
                           ),
                         ),
-                      ),
-                      if (badge != null) ...[
-                        const SizedBox(width: 6),
-                        RelationBadge(
-                          label: badge,
-                          tint: _state == FriendState.requestedMe
-                              ? ExplorePalette.badgeHotBg
-                              : ExplorePalette.badgeMeBg,
-                          ink: _state == FriendState.requestedMe
-                              ? ExplorePalette.badgeHotInk
-                              : ExplorePalette.brand700,
-                        ),
+                        if (badge != null) ...[
+                          const SizedBox(width: 6),
+                          RelationBadge(
+                            label: badge,
+                            tint: _state == FriendState.requestedMe
+                                ? ExplorePalette.badgeHotBg
+                                : ExplorePalette.badgeMeBg,
+                            ink: _state == FriendState.requestedMe
+                                ? ExplorePalette.badgeHotInk
+                                : ExplorePalette.brand700,
+                          ),
+                        ],
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  ExploreMetaLine(
-                    parts: <String>[
-                      _person.atHandle,
-                      if (_person.mutualCount > 0)
-                        '${_person.mutualCount} mutual',
-                      if (online) 'now',
-                    ],
-                    online: online,
-                  ),
-                  MatchMeter(score: widget.hit.score),
-                ],
+                    ),
+                    const SizedBox(height: 2),
+                    ExploreMetaLine(
+                      parts: <String>[
+                        _person.atHandle,
+                        if (_person.mutualCount > 0)
+                          '${_person.mutualCount} mutual',
+                        if (online) 'now',
+                      ],
+                      online: online,
+                    ),
+                    MatchMeter(score: widget.hit.score),
+                  ],
+                ),
               ),
             ),
             const SizedBox(width: 8),

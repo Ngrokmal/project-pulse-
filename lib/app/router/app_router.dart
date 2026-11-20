@@ -12,6 +12,8 @@ import '../../features/chat/presentation/create_group_screen.dart';
 import '../../features/force_audio/presentation/force_audio_screen.dart';
 import '../../features/diagnostics/presentation/connection_screen.dart';
 import '../../features/profile/presentation/blocked_people_screen.dart';
+import '../../features/profile/presentation/peer_card_screen.dart';
+import '../../features/profile/presentation/profile_visitors_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
@@ -89,6 +91,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'edit-profile',
         pageBuilder: (context, state) =>
             _fade(state, const EditProfileScreen()),
+      ),
+      // Someone else's card, read the way a visitor reads it. Reached by opening
+      // a person (a search result, a visitor in Profile views) — never by a
+      // button that says "Message".
+      GoRoute(
+        path: '/u/:id',
+        name: 'peer-card',
+        pageBuilder: (context, state) =>
+            _fade(state, PeerCardScreen(peerId: state.pathParameters['id']!)),
+      ),
+      GoRoute(
+        path: '/profile/views',
+        name: 'profile-views',
+        pageBuilder: (context, state) =>
+            _fade(state, const ProfileVisitorsScreen()),
       ),
       GoRoute(
         path: '/blocked',
