@@ -80,7 +80,11 @@ class _Backdrop extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          stops: [0, 0.34, 0.62],
+          // A long, soft fall: the navy must be gone by the time the first
+          // card arrives, and must never end as a visible seam.
+          // The navy must be *finished* before the first line of ink, or the
+          // empty state writes dark grey on a dark blue.
+          stops: [0.0, 0.11, 0.34],
           colors: [AppColors.navy800, AppColors.navy900, AppColors.bg],
         ),
       ),
@@ -319,25 +323,27 @@ class _BlockedTile extends ConsumerWidget {
       child: Row(
         children: [
           // The same comet aperture as the card, small enough to be a portrait.
+          // The ring's footprint is faceSize + 2·(gap + 12) — anything smaller
+          // clips the comet into a smear.
           SizedBox(
-            width: 58,
-            height: 58,
+            width: 64,
+            height: 64,
             child: OrbitRing(
-              faceSize: 44,
+              faceSize: 40,
               gap: 2,
               spark: index == 0,
               face: ClipOval(
                 child: SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: 40,
+                  height: 40,
                   child: url != null && url.isNotEmpty
                       ? Image.network(
                           url,
                           fit: BoxFit.cover,
                           errorBuilder: (_, _, _) =>
-                              _Initials(person: person, size: 44),
+                              _Initials(person: person, size: 40),
                         )
-                      : _Initials(person: person, size: 44),
+                      : _Initials(person: person, size: 40),
                 ),
               ),
             ),
@@ -356,45 +362,16 @@ class _BlockedTile extends ConsumerWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    if (person.username != null) ...[
-                      Flexible(
-                        child: Text(
-                          person.username!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.micro.copyWith(
-                            fontSize: 11.5,
-                            color: AppColors.textMuted,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFC9C4DA),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 7),
-                    ],
-                    Flexible(
-                      child: Text(
-                        person.blockedLabel(now),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.micro.copyWith(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.danger.withValues(alpha: 0.78),
-                        ),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 3),
+                Text(
+                  person.blockedLabel(now),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: AppTypography.micro.copyWith(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.danger.withValues(alpha: 0.75),
+                  ),
                 ),
               ],
             ),

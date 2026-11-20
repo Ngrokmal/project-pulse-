@@ -112,8 +112,10 @@ class _OrbitRingState extends State<OrbitRing> with TickerProviderStateMixin {
                   child: Transform.scale(
                     scale: 0.94 + 0.12 * t,
                     child: Container(
-                      width: widget.faceSize + 62,
-                      height: widget.faceSize + 62,
+                      // Proportional, so a 40 px portrait gets a halo the size
+                      // of a portrait and not one that has to be clipped.
+                      width: widget.faceSize * 1.5,
+                      height: widget.faceSize * 1.5,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
