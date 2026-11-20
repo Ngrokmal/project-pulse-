@@ -12,6 +12,7 @@ import '../features/notifications/application/push_message_controller.dart';
 import '../features/notifications/domain/push_message.dart';
 import '../features/shell/presentation/config_missing_screen.dart';
 import 'router/app_router.dart';
+import '../features/update/presentation/widgets/update_resume_gate.dart';
 
 final _log = AppLogger('app');
 
@@ -88,7 +89,16 @@ class PulseApp extends ConsumerWidget {
         );
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: scaler),
-          child: child ?? const SizedBox.shrink(),
+          // Above the router on purpose: wherever the user left the app, coming
+          // back asks the release channel again (see UpdateResumeGate).
+          // The router is handed in rather than looked up: this builder runs
+          // *above* the router's inherited scope, where `GoRouter.of` throws.
+          child: UpdateResumeGate(
+            routes: router.routerDelegate,
+            location: () => router.routerDelegate.currentConfiguration.uri.path,
+            openUpdate: () => router.go('/update'),
+            child: child ?? const SizedBox.shrink(),
+          ),
         );
       },
     );

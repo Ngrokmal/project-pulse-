@@ -23,11 +23,15 @@ class SearchResultTile extends StatefulWidget {
     super.key,
     required this.hit,
     required this.actions,
+    required this.onOpenChat,
     this.entranceDelay = Duration.zero,
   });
 
   final SearchHit hit;
   final FriendActions actions;
+
+  /// Opens the real 1:1 conversation (the sheet closes first).
+  final VoidCallback onOpenChat;
   final Duration entranceDelay;
 
   @override
@@ -166,7 +170,7 @@ class _SearchResultTileState extends State<SearchResultTile> {
               onAdd: _add,
               onCancel: _cancel,
               onAccept: _accept,
-              onMessage: () => widget.actions.message(_person),
+              onMessage: widget.onOpenChat,
             ),
           ],
         ),

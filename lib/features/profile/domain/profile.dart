@@ -1,4 +1,9 @@
-/// A PULSE profile — mirrors public.profiles (migrations/0001).
+import 'profile_privacy.dart';
+
+/// A PULSE profile — mirrors public.profiles (migrations/0001 + 0012).
+///
+/// Everything here is stored. Nothing is measured, inferred or counted: the
+/// card this domain feeds has no statistics on it by design.
 class Profile {
   const Profile({
     required this.id,
@@ -8,6 +13,12 @@ class Profile {
     this.avatarUrl,
     this.coverUrl,
     this.joinedAt,
+    this.statusText = '',
+    this.whereText = '',
+    this.timezone,
+    this.utcOffsetMinutes,
+    this.labels = const <String>[],
+    this.privacy = ProfilePrivacy.defaults,
   });
 
   final String id;
@@ -17,6 +28,30 @@ class Profile {
   final String? avatarUrl;
   final String? coverUrl;
   final DateTime? joinedAt;
+
+  /// The status line, typed by its owner. Empty means the tile disappears.
+  final String statusText;
+
+  /// The place, typed by its owner. Empty means the row disappears — never
+  /// filled in from GPS, an IP address or a timezone guess.
+  final String whereText;
+
+  /// The zone label the owner's device reported when they saved (for example
+  /// "Dhaka"), plus the offset in minutes. Together they render `6:11 PM · Dhaka`
+  /// with arithmetic only.
+  final String? timezone;
+  final int? utcOffsetMinutes;
+
+  /// Up to [maxLabels] short labels — "Family", "Work" — shown under Kept close.
+  final List<String> labels;
+
+  final ProfilePrivacy privacy;
+
+  // Guard rails, matching the CHECK constraints in 0012 exactly.
+  static const int statusMax = 80;
+  static const int whereMax = 40;
+  static const int labelMax = 20;
+  static const int maxLabels = 6;
 
   factory Profile.fromMap(Map<String, dynamic> map) => Profile(
     id: map['id'] as String,
@@ -28,24 +63,74 @@ class Profile {
     joinedAt: map['joined_at'] == null
         ? null
         : DateTime.tryParse(map['joined_at'] as String)?.toLocal(),
+    statusText: (map['status_text'] as String?) ?? '',
+    whereText: (map['where_text'] as String?) ?? '',
+    timezone: map['timezone'] as String?,
+    utcOffsetMinutes: (map['utc_offset_minutes'] as num?)?.toInt(),
+    labels: _parseLabels(map['labels']),
+    privacy: ProfilePrivacy.fromMap(map),
   );
+
+  /// The inverse of [Profile.fromMap], used by the offline cache. Only the
+  /// columns the card reads, so a cached row can be replayed without a schema
+  /// surprise later.
+  Map<String, Object?> toMap() => <String, Object?>{
+    'id': id,
+    'display_name': displayName,
+    'username': username,
+    'bio': bio,
+    'avatar_url': avatarUrl,
+    'cover_url': coverUrl,
+    'joined_at': joinedAt?.toIso8601String(),
+    'status_text': statusText,
+    'where_text': whereText,
+    'timezone': timezone,
+    'utc_offset_minutes': utcOffsetMinutes,
+    'labels': labels,
+    ...privacy.toMap(),
+  };
+
+  static List<String> _parseLabels(Object? raw) {
+    if (raw is! List) return const <String>[];
+    return List<String>.unmodifiable(
+      raw
+          .whereType<String>()
+          .map((label) => label.trim())
+          .where((label) => label.isNotEmpty)
+          .take(maxLabels),
+    );
+  }
 
   Profile copyWith({
     String? displayName,
     String? username,
     String? bio,
+    String? avatarUrl,
+    bool clearAvatar = false,
     bool clearUsername = false,
+    String? statusText,
+    String? whereText,
+    String? timezone,
+    int? utcOffsetMinutes,
+    List<String>? labels,
+    ProfilePrivacy? privacy,
   }) => Profile(
     id: id,
     displayName: displayName ?? this.displayName,
     username: clearUsername ? null : (username ?? this.username),
     bio: bio ?? this.bio,
-    avatarUrl: avatarUrl,
+    avatarUrl: clearAvatar ? null : (avatarUrl ?? this.avatarUrl),
     coverUrl: coverUrl,
     joinedAt: joinedAt,
+    statusText: statusText ?? this.statusText,
+    whereText: whereText ?? this.whereText,
+    timezone: timezone ?? this.timezone,
+    utcOffsetMinutes: utcOffsetMinutes ?? this.utcOffsetMinutes,
+    labels: labels ?? this.labels,
+    privacy: privacy ?? this.privacy,
   );
 
-  /// Rules must match the DB constraints in 0001_profiles.sql exactly.
+  /// Rules must match the DB constraints in 0001 and 0012 exactly.
   static final RegExp usernamePattern = RegExp(r'^[a-z0-9_]{3,24}$');
   static const int displayNameMax = 60;
   static const int bioMax = 200;
@@ -75,6 +160,27 @@ class Profile {
     return null;
   }
 
+  static String? validateStatus(String input) {
+    if (input.trim().length > statusMax) {
+      return 'Use at most $statusMax characters';
+    }
+    return null;
+  }
+
+  static String? validateWhere(String input) {
+    if (input.trim().length > whereMax) {
+      return 'Use at most $whereMax characters';
+    }
+    return null;
+  }
+
+  static String? validateLabel(String input) {
+    final v = input.trim();
+    if (v.isEmpty) return 'A label needs a name';
+    if (v.length > labelMax) return 'Use at most $labelMax characters';
+    return null;
+  }
+
   String get initials {
     final source = displayName.trim().isEmpty
         ? (username ?? '?')
@@ -91,5 +197,24 @@ class Profile {
       return first(parts.first);
     }
     return first(parts.first) + first(parts.last);
+  }
+
+  /// `@saiful`, or null when no handle has been chosen yet.
+  String? get handle {
+    final name = username?.trim() ?? '';
+    return name.isEmpty ? null : '@$name';
+  }
+
+  /// The one link that opens this card.
+  String? get shareLink {
+    final name = username?.trim() ?? '';
+    return name.isEmpty ? null : 'pulse.app/@$name';
+  }
+
+  /// What "Message" should say when there is nobody to message yet.
+  String get givenName {
+    final clean = displayName.trim();
+    if (clean.isEmpty) return 'This person';
+    return clean.split(RegExp(r'\s+')).first;
   }
 }

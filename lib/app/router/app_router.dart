@@ -7,6 +7,7 @@ import '../../features/dev/presentation/design_gallery.dart';
 import '../../features/calls/presentation/call_screen.dart';
 import '../../features/inbox/presentation/personal_inbox_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/update/presentation/update_screen.dart';
 import '../../features/chat/presentation/create_group_screen.dart';
 import '../../features/force_audio/presentation/force_audio_screen.dart';
 import '../../features/diagnostics/presentation/connection_screen.dart';
@@ -38,6 +39,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             startInSignup: state.uri.queryParameters['mode'] == 'signup',
           ),
         ),
+      ),
+      GoRoute(
+        path: '/update',
+        name: 'update',
+        pageBuilder: (context, state) => _fade(state, const UpdateScreen()),
       ),
       GoRoute(
         path: '/app',

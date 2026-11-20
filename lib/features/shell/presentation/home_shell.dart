@@ -27,6 +27,13 @@ class HomeShell extends ConsumerStatefulWidget {
 class _HomeShellState extends ConsumerState<HomeShell> {
   int _index = 0;
 
+  static const List<Widget> _screens = <Widget>[
+    ChatsScreen(),
+    CallsScreen(),
+    ExploreScreen(),
+    ProfileScreen(),
+  ];
+
   static const _tabs = [
     (Icons.chat_bubble_outline_rounded, Icons.chat_bubble_rounded, 'Home'),
     (Icons.call_outlined, Icons.call_rounded, 'Calls'),
@@ -46,11 +53,12 @@ class _HomeShellState extends ConsumerState<HomeShell> {
             Expanded(
               child: IndexedStack(
                 index: _index,
-                children: const [
-                  ChatsScreen(),
-                  CallsScreen(),
-                  ExploreScreen(),
-                  ProfileScreen(),
+                children: [
+                  // Keep every tab warm, but only the visible one may animate:
+                  // an off-screen tab that keeps ticking is exactly how a phone
+                  // drops frames for a screen nobody is looking at.
+                  for (final (index, screen) in _screens.indexed)
+                    TickerMode(enabled: index == _index, child: screen),
                 ],
               ),
             ),

@@ -13,6 +13,7 @@ import '../../domain/explore_palette.dart';
 import '../../domain/friend_state.dart';
 import '../../domain/people_search.dart';
 import '../../domain/person.dart';
+import '../explore_chat.dart';
 import 'explore_skeleton.dart';
 import 'explore_search_bar.dart';
 import 'explore_toast_host.dart';
@@ -321,6 +322,19 @@ class _ResultsView extends ConsumerWidget {
 
   final PeopleSearch result;
 
+  /// Close the sheet, then push the conversation: the sheet is a layer, not a
+  /// place, and leaving it open behind the inbox would make Back go to a stale
+  /// search.
+  Future<void> _openChatWith(
+    BuildContext context,
+    WidgetRef ref,
+    Person person,
+  ) async {
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await openExploreChat(navigator.context, ref, person);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final actions = ref.read(friendActionsProvider);
@@ -400,6 +414,7 @@ class _ResultsView extends ConsumerWidget {
                 key: ValueKey<String>(hit.person.id),
                 hit: hit,
                 actions: actions,
+                onOpenChat: () => _openChatWith(context, ref, hit.person),
                 entranceDelay: ExploreMotion.rowStagger * (index.clamp(0, 6)),
               );
             },

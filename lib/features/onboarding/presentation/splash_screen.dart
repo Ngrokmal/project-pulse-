@@ -12,6 +12,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/pulse_mark.dart';
 import '../../auth/application/auth_controller.dart';
+import '../../update/application/update_controller.dart';
 
 /// Splash / brand intro (§26): brief, elegant, skippable in effect — it never
 /// blocks a valid session longer than the animation itself.
@@ -54,9 +55,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // Read context-dependent state before any await (no context across gaps).
     final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     // Restore session (never throws) — done in parallel with the animation.
+    // Is there a newer build? The question is asked *alongside* the session
+    // restore, not after it, and it gives up after two seconds: an update may
+    // interrupt a launch, but a slow release channel never may. Whatever this
+    // ask misses is picked up by the heartbeat on the other side of the splash,
+    // so the two together are faster *and* more forgiving than either alone.
+    final updateCheck = ref
+        .read(updateControllerProvider.notifier)
+        .checkAtBoot();
+
     if (AppConfig.isBackendConfigured) {
       await ref.read(authControllerProvider.notifier).restore();
     }
+    await updateCheck;
     if (!mounted) return;
     final hold = reduce ? Duration.zero : AppMotion.splashHold;
     _holdTimer = Timer(hold, _routeNext);
@@ -68,6 +79,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     if (!mounted || _routed) return;
     _routed = true;
     final auth = ref.read(authControllerProvider);
+
+    // A published update is the first thing the app says, before the shell: it is
+    // the only way a sideloaded build ever becomes a newer one.
+    if (ref.read(updateControllerProvider).shouldPrompt) {
+      context.go('/update');
+      return;
+    }
+
     context.go(auth is AuthSignedIn ? '/app' : '/welcome');
   }
 
