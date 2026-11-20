@@ -382,7 +382,7 @@ class UpdateController extends Notifier<UpdateState> {
 
     final store = await ref.read(updateStoreProvider.future);
     final reusable = await store.reusableApk(
-      versionCode: latest.channelBuild,
+      build: latest.channelBuild,
       abi: abi,
       sha256: variant.sha256,
       sizeBytes: variant.sizeBytes,
@@ -417,8 +417,59 @@ class UpdateController extends Notifier<UpdateState> {
     }
 
     final abi = deviceAbiKey();
+    // The one number every file of this release is named after. Android's
+    // `versionCode` (2053 for build 53 on arm64) is never used to key a file:
+    // that mismatch is what made every finished download fail at the last step.
+    final build = update.channelBuild;
     final store = await ref.read(updateStoreProvider.future);
-    final part = store.partFile(update.channelBuild, abi);
+
+    // Before asking the network for 28 MB again: is the file already here?
+    //   • committed and stamped  → straight to ready;
+    //   • finished but never committed (the app died, or the move failed) →
+    //     promote the bytes we already have instead of downloading them again.
+    final committed = await store.reusableApk(
+      build: build,
+      abi: abi,
+      sha256: variant.sha256,
+      sizeBytes: variant.sizeBytes,
+    );
+    if (committed != null) {
+      state = state.copyWith(
+        phase: UpdatePhase.ready,
+        apkPath: committed,
+        received: variant.sizeBytes,
+        total: variant.sizeBytes,
+        canInstall: await _installer.canInstall(),
+        clearMessage: true,
+      );
+      return;
+    }
+    final finished = await store.finishedPart(
+      build: build,
+      abi: abi,
+      sha256: variant.sha256,
+      sizeBytes: variant.sizeBytes,
+      digestOf: _sha256OfFile,
+    );
+    if (finished != null) {
+      final file = store.commit(
+        build: build,
+        abi: abi,
+        sha256: variant.sha256,
+        sizeBytes: variant.sizeBytes,
+      );
+      state = state.copyWith(
+        phase: UpdatePhase.ready,
+        apkPath: file.path,
+        received: variant.sizeBytes,
+        total: variant.sizeBytes,
+        canInstall: await _installer.canInstall(),
+        clearMessage: true,
+      );
+      return;
+    }
+
+    final part = store.partFile(build, abi);
     if (part.existsSync()) part.deleteSync();
 
     state = state.copyWith(
@@ -469,9 +520,12 @@ class UpdateController extends Notifier<UpdateState> {
       }
 
       final file = store.commit(
-        versionCode: update.versionCode,
+        build: build,
         abi: abi,
         sha256: variant.sha256,
+        // The commit re-checks the size itself, so a short write cannot be
+        // stamped as good.
+        sizeBytes: variant.sizeBytes,
       );
 
       state = state.copyWith(
@@ -487,11 +541,14 @@ class UpdateController extends Notifier<UpdateState> {
         message: failure.userMessage,
       );
     } on Object {
+      // Only a genuine surprise reaches here — an IO or network exception that
+      // is not already typed. The copy says the one useful thing: tap again.
       state = state.copyWith(
         phase: UpdatePhase.failed,
         message:
-            'The download stopped. You can try again — the app will pick up '
-            'from the beginning rather than leave a half file.',
+            'The download was interrupted before it finished. Tap Download '
+            'update — Pulse keeps whatever arrived and will not start over '
+            'needlessly.',
       );
     } finally {
       await sink?.close();
@@ -508,7 +565,7 @@ class UpdateController extends Notifier<UpdateState> {
     final update = state.update;
     if (update == null) return;
     final store = await ref.read(updateStoreProvider.future);
-    final part = store.partFile(update.versionCode, deviceAbiKey());
+    final part = store.partFile(update.channelBuild, deviceAbiKey());
     if (part.existsSync()) part.deleteSync();
     state = state.copyWith(phase: UpdatePhase.available, received: 0);
   }

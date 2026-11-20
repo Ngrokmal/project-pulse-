@@ -131,6 +131,28 @@ class ServerFailure extends AppFailure {
   bool get isRetryable => (statusCode == null || statusCode! >= 500);
 }
 
+/// A failure inside the update download or its file handling.
+///
+/// It exists because the generic "something went wrong" is useless when the
+/// person has just waited a minute for 28 MB: each case below says what actually
+/// happened and what the next tap will do.
+class UpdateFailure extends AppFailure {
+  const UpdateFailure(this.safeCode, this._message, {super.correlationId});
+
+  final String safeCode;
+  final String _message;
+
+  @override
+  String get code => 'update_$safeCode';
+
+  @override
+  String get userMessage => _message;
+
+  /// Every one of these is worth another tap.
+  @override
+  bool get isRetryable => true;
+}
+
 /// A feature whose backend half has not been applied yet.
 ///
 /// This exists so the Explore tab can say the true thing ("run 0010_friends.sql")
