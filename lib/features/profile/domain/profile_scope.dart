@@ -33,7 +33,8 @@ enum ProfileAction {
   bool allowedFor(ProfileViewMode mode) => owner == mode;
 
   /// Actions that end something. They are only ever painted in a danger block.
-  bool get isDestructive => this == block || this == report || this == clearChat;
+  bool get isDestructive =>
+      this == block || this == report || this == clearChat;
 }
 
 /// The arrangement of verbs for one scope — the single source the widgets read.
@@ -46,7 +47,8 @@ abstract final class ProfileScopePlan {
       mode.isVisitor ? ProfileAction.message : ProfileAction.editCard;
 
   /// The icon buttons beside the primary one.
-  static List<ProfileAction> quickActions(ProfileViewMode mode) => mode.isVisitor
+  static List<ProfileAction> quickActions(ProfileViewMode mode) =>
+      mode.isVisitor
       ? const <ProfileAction>[ProfileAction.call, ProfileAction.video]
       : const <ProfileAction>[ProfileAction.shareLink, ProfileAction.showCode];
 

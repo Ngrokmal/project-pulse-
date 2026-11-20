@@ -220,7 +220,9 @@ void main() {
       expect(find.text(RightNowBoard.disclaimer), findsOneWidget);
     });
 
-    testWidgets('a visitor gets Safety, never the owner switches', (tester) async {
+    testWidgets('a visitor gets Safety, never the owner switches', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -247,7 +249,9 @@ void main() {
       expect(find.text('YOUR ACCOUNT'), findsNothing);
     });
 
-    testWidgets('the owner gets Privacy, and never a danger block', (tester) async {
+    testWidgets('the owner gets Privacy, and never a danger block', (
+      tester,
+    ) async {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(

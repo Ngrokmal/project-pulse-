@@ -685,10 +685,7 @@ class _SafetyRow extends ConsumerWidget {
         .read(safetyControllerProvider.notifier)
         .run(action, targetUserId: peerId);
     if (!context.mounted) return;
-    _say(
-      context,
-      failure == null ? action.doneLabel : failure.userMessage,
-    );
+    _say(context, failure == null ? action.doneLabel : failure.userMessage);
     if (failure == null) Navigator.of(context).maybePop();
   }
 
@@ -716,9 +713,7 @@ class _SafetyRow extends ConsumerWidget {
     if (!context.mounted) return;
     _say(
       context,
-      failure == null
-          ? SafetyAction.report.doneLabel
-          : failure.userMessage,
+      failure == null ? SafetyAction.report.doneLabel : failure.userMessage,
     );
   }
 

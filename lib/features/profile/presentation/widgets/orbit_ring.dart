@@ -118,7 +118,9 @@ class _OrbitRingState extends State<OrbitRing> with TickerProviderStateMixin {
                         shape: BoxShape.circle,
                         gradient: RadialGradient(
                           colors: [
-                            AppColors.brand400.withValues(alpha: 0.20 + 0.10 * t),
+                            AppColors.brand400.withValues(
+                              alpha: 0.20 + 0.10 * t,
+                            ),
                             AppColors.brand600.withValues(alpha: 0.10),
                             AppColors.blue500.withValues(alpha: 0.0),
                           ],
@@ -231,7 +233,8 @@ class _OrbitPainter extends CustomPainter {
     // 3. the spark: one bead of light on the head, with a soft halo
     if (!spark) return;
     final sparkAngle = angle - math.pi / 2 + _headDegrees * math.pi / 180;
-    final head = center + Offset(math.cos(sparkAngle), math.sin(sparkAngle)) * radius;
+    final head =
+        center + Offset(math.cos(sparkAngle), math.sin(sparkAngle)) * radius;
 
     canvas.drawCircle(
       head,

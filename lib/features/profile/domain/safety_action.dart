@@ -7,7 +7,8 @@
 enum SafetyAction {
   clearChat(
     title: 'Clear this chat?',
-    body: 'Every message and file leaves this phone. The other person keeps '
+    body:
+        'Every message and file leaves this phone. The other person keeps '
         'their own copy — you just stop seeing it here.',
     confirmLabel: 'Clear',
     doneLabel: 'Chat cleared',
@@ -20,7 +21,8 @@ enum SafetyAction {
   ),
   report(
     title: 'Report ?name?',
-    body: 'Your report goes to the Pulse safety team. They are never told you '
+    body:
+        'Your report goes to the Pulse safety team. They are never told you '
         'sent it.',
     confirmLabel: 'Report',
     doneLabel: 'Report sent',
@@ -40,8 +42,10 @@ enum SafetyAction {
 
   /// Fills `?name?` with the person's first name, or with "this person" when
   /// the card has not loaded.
-  String titleFor(String givenName) =>
-      title.replaceAll('?name?', givenName.trim().isEmpty ? 'this person' : givenName.trim());
+  String titleFor(String givenName) => title.replaceAll(
+    '?name?',
+    givenName.trim().isEmpty ? 'this person' : givenName.trim(),
+  );
 
   bool get isDestructive => true;
 }

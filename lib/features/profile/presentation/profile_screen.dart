@@ -480,11 +480,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           'Open the thread',
         ),
         ProfileAction.call => (Icons.call_outlined, 'Call', 'Voice'),
-        ProfileAction.video => (
-          Icons.videocam_outlined,
-          'Video',
-          'Camera on',
-        ),
+        ProfileAction.video => (Icons.videocam_outlined, 'Video', 'Camera on'),
         ProfileAction.copyHandle => (
           Icons.copy_rounded,
           'Copy handle',
@@ -529,9 +525,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   /// Said once, for every verb that needs someone else on the other end.
-  void _previewOnly() => _toast(
-    'A preview of your card — these act on a person inside a chat.',
-  );
+  void _previewOnly() =>
+      _toast('A preview of your card — these act on a person inside a chat.');
 
   /// Sends whatever is queued in the outbox, then re-reads the row so the
   /// switches settle on what the server actually stored.

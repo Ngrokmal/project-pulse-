@@ -31,8 +31,7 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
   final ProfilePhotoPicker _picker = ProfilePhotoPicker();
   bool _picking = false;
 
-  PhotoStudioController get _studio =>
-      ref.read(photoStudioProvider.notifier);
+  PhotoStudioController get _studio => ref.read(photoStudioProvider.notifier);
 
   String? get _userId {
     final auth = ref.read(authControllerProvider);
@@ -154,10 +153,7 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
                 _Stage(state: state, initials: widget.profile.initials),
                 const SizedBox(height: 14),
                 if (state.hasPhoto)
-                  _ZoomRow(
-                    value: state.crop.zoom,
-                    onChanged: _studio.zoomTo,
-                  )
+                  _ZoomRow(value: state.crop.zoom, onChanged: _studio.zoomTo)
                 else
                   Text(
                     hasExisting
@@ -199,9 +195,7 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
                           icon: Icons.text_fields_rounded,
                           label: 'Initials',
                           busy: state.busy,
-                          onTap: state.hasPhoto
-                              ? _studio.useInitials
-                              : _remove,
+                          onTap: state.hasPhoto ? _studio.useInitials : _remove,
                         ),
                       ),
                     ],
@@ -364,7 +358,11 @@ class _ZoomRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const Icon(Icons.zoom_out_rounded, size: 17, color: AppColors.textMuted),
+        const Icon(
+          Icons.zoom_out_rounded,
+          size: 17,
+          color: AppColors.textMuted,
+        ),
         Expanded(
           child: SliderTheme(
             data: SliderTheme.of(context).copyWith(
@@ -450,7 +448,11 @@ class _ErrorLine extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline_rounded, size: 16, color: AppColors.danger),
+          const Icon(
+            Icons.error_outline_rounded,
+            size: 16,
+            color: AppColors.danger,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

@@ -47,10 +47,7 @@ class SafetyLens extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (preview) ...[
-          const _PreviewNote(),
-          const SizedBox(height: 14),
-        ],
+        if (preview) ...[const _PreviewNote(), const SizedBox(height: 14)],
         const PulseEyebrow('THIS CHAT'),
         PulseRowStack(
           children: [

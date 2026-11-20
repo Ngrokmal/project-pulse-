@@ -6,11 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 /// on the server, some switches are waiting for a connection, or we are reading
 /// a cached copy. Nothing else is inferred.
 class ProfileSyncState {
-  const ProfileSyncState({
-    this.offline = false,
-    this.pending = 0,
-    this.note,
-  });
+  const ProfileSyncState({this.offline = false, this.pending = 0, this.note});
 
   /// The last read came from the cache because the network did not answer.
   final bool offline;

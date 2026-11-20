@@ -273,7 +273,10 @@ class ProfileController extends AsyncNotifier<Profile?> {
   void applyAvatar(String? avatarUrl) {
     final current = state.value;
     if (current == null) return;
-    final updated = current.copyWith(avatarUrl: avatarUrl, clearAvatar: avatarUrl == null);
+    final updated = current.copyWith(
+      avatarUrl: avatarUrl,
+      clearAvatar: avatarUrl == null,
+    );
     state = AsyncData(updated);
     _store?.cacheProfile(updated);
   }
@@ -291,7 +294,9 @@ class ProfileController extends AsyncNotifier<Profile?> {
     );
     final sync = ref.read(profileSyncProvider.notifier);
     sync.setPending(store.pending(userId).length);
-    sync.setNote('Saved on this device — it will sync when you are back online.');
+    sync.setNote(
+      'Saved on this device — it will sync when you are back online.',
+    );
   }
 }
 

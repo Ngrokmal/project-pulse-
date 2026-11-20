@@ -139,10 +139,7 @@ class PrivacyLens extends StatelessWidget {
             ),
           ],
         ),
-        if (deviceCard != null) ...[
-          const SizedBox(height: 16),
-          deviceCard!,
-        ],
+        if (deviceCard != null) ...[const SizedBox(height: 16), deviceCard!],
       ],
     );
   }
@@ -175,7 +172,8 @@ class _SyncBanner extends StatelessWidget {
         : pending > 0
         ? '$pending change${pending == 1 ? '' : 's'} waiting'
         : 'Everything is saved';
-    final body = sync.note ??
+    final body =
+        sync.note ??
         (offline
             ? 'Showing the copy saved on this phone.'
             : 'The card on the server matches this device.');
@@ -224,10 +222,7 @@ class _SyncBanner extends StatelessWidget {
             ),
           ),
           if (pending > 0 || offline)
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
+            TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
@@ -254,9 +249,10 @@ class _SessionsRow extends StatelessWidget {
     final subtitle = switch (sessions) {
       AsyncLoading() => 'Checking the devices on this account',
       AsyncError() => 'Could not read your devices right now',
-      _ => count <= 1
-          ? 'This phone is the only one signed in'
-          : '$count devices signed in',
+      _ =>
+        count <= 1
+            ? 'This phone is the only one signed in'
+            : '$count devices signed in',
     };
 
     return PulseRow(

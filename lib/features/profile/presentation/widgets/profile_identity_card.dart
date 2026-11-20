@@ -86,20 +86,14 @@ class ProfileIdentityCard extends StatelessWidget {
               ],
               // Your own card never claims a presence: you are looking at a
               // record, not at someone who is online.
-              if (mode.isVisitor)
-                const _LiveChip()
-              else
-                const _OwnerChip(),
+              if (mode.isVisitor) const _LiveChip() else const _OwnerChip(),
             ],
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
-                child: _PrimaryCta(
-                  action: plan,
-                  onTap: () => onAction(plan),
-                ),
+                child: _PrimaryCta(action: plan, onTap: () => onAction(plan)),
               ),
               for (final action in quick) ...[
                 const SizedBox(width: 9),
@@ -195,7 +189,11 @@ class _OwnerChip extends StatelessWidget {
     child: Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Icon(Icons.lock_outline_rounded, size: 12, color: AppColors.brand700),
+        const Icon(
+          Icons.lock_outline_rounded,
+          size: 12,
+          color: AppColors.brand700,
+        ),
         const SizedBox(width: 5),
         Text(
           'Only you can edit this',

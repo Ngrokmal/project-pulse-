@@ -249,7 +249,10 @@ class _FaceState extends State<_Face> with SingleTickerProviderStateMixin {
                   final travel = t < 0.58 ? 0.0 : (t - 0.58) / 0.26;
                   if (t >= 0.84) return const SizedBox.shrink();
                   return Transform.translate(
-                    offset: Offset(-size * 1.1 + travel.clamp(0, 1) * size * 2.2, 0),
+                    offset: Offset(
+                      -size * 1.1 + travel.clamp(0, 1) * size * 2.2,
+                      0,
+                    ),
                     child: Transform.rotate(
                       angle: -0.32,
                       child: Container(

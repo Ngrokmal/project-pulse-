@@ -27,7 +27,10 @@ class ProfilePhotoRasterizer {
       final frame = await codec.getNextFrame();
       image = frame.image;
     } catch (_) {
-      throw const ValidationFailure('photo', 'That file is not a readable image.');
+      throw const ValidationFailure(
+        'photo',
+        'That file is not a readable image.',
+      );
     }
 
     try {
@@ -43,12 +46,18 @@ class ProfilePhotoRasterizer {
         Paint()..filterQuality = FilterQuality.high,
       );
       final picture = recorder.endRecording();
-      final output = await picture.toImage(PhotoCrop.outputEdge, PhotoCrop.outputEdge);
+      final output = await picture.toImage(
+        PhotoCrop.outputEdge,
+        PhotoCrop.outputEdge,
+      );
       final data = await output.toByteData(format: ui.ImageByteFormat.png);
       picture.dispose();
       output.dispose();
       if (data == null) {
-        throw const ValidationFailure('photo', 'That photo could not be prepared.');
+        throw const ValidationFailure(
+          'photo',
+          'That photo could not be prepared.',
+        );
       }
       return data.buffer.asUint8List();
     } finally {

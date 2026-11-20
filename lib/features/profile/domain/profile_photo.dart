@@ -32,7 +32,10 @@ class ProfilePhoto {
   int get sizeBytes => bytes.length;
 
   /// Null when the file is acceptable, otherwise a sentence for the sheet.
-  static String? validate({required Uint8List bytes, required String mimeType}) {
+  static String? validate({
+    required Uint8List bytes,
+    required String mimeType,
+  }) {
     if (bytes.isEmpty) return 'That file is empty.';
     if (bytes.length > maxBytes) {
       return 'That photo is larger than 5 MB. Pick a smaller one.';
@@ -53,11 +56,12 @@ class ProfilePhoto {
     return '$userId/avatar-${at.millisecondsSinceEpoch}.${extensionFor(mimeType)}';
   }
 
-  static String extensionFor(String mimeType) => switch (mimeType.toLowerCase()) {
-    'image/png' => 'png',
-    'image/webp' => 'webp',
-    _ => 'jpg',
-  };
+  static String extensionFor(String mimeType) =>
+      switch (mimeType.toLowerCase()) {
+        'image/png' => 'png',
+        'image/webp' => 'webp',
+        _ => 'jpg',
+      };
 }
 
 /// The crop a person sets in the studio: a zoom and a pan over a square window.
@@ -101,7 +105,10 @@ class PhotoCrop {
   /// How far the image may slide on each axis, in window pixels.
   Offset _panLimit(Size imageSize) {
     final fit = coverScale(imageSize);
-    final scaled = Size(imageSize.width * fit * zoom, imageSize.height * fit * zoom);
+    final scaled = Size(
+      imageSize.width * fit * zoom,
+      imageSize.height * fit * zoom,
+    );
     return Offset(
       math.max(0, (scaled.width - window) / 2),
       math.max(0, (scaled.height - window) / 2),
@@ -125,8 +132,14 @@ class PhotoCrop {
       imageSize.width / 2 - offset.dx / (coverScale(imageSize) * zoom),
       imageSize.height / 2 - offset.dy / (coverScale(imageSize) * zoom),
     );
-    final left = (center.dx - edge / 2).clamp(0.0, math.max(0.0, imageSize.width - edge));
-    final top = (center.dy - edge / 2).clamp(0.0, math.max(0.0, imageSize.height - edge));
+    final left = (center.dx - edge / 2).clamp(
+      0.0,
+      math.max(0.0, imageSize.width - edge),
+    );
+    final top = (center.dy - edge / 2).clamp(
+      0.0,
+      math.max(0.0, imageSize.height - edge),
+    );
     return Rect.fromLTWH(left.toDouble(), top.toDouble(), edge, edge);
   }
 
@@ -135,8 +148,12 @@ class PhotoCrop {
   PhotoCrop rebasedFor(Size imageSize) => PhotoCrop(
     zoom: zoom.clamp(minZoom, maxZoom).toDouble(),
     offset: Offset(
-      offset.dx.clamp(-_panLimit(imageSize).dx, _panLimit(imageSize).dx).toDouble(),
-      offset.dy.clamp(-_panLimit(imageSize).dy, _panLimit(imageSize).dy).toDouble(),
+      offset.dx
+          .clamp(-_panLimit(imageSize).dx, _panLimit(imageSize).dx)
+          .toDouble(),
+      offset.dy
+          .clamp(-_panLimit(imageSize).dy, _panLimit(imageSize).dy)
+          .toDouble(),
     ),
   );
 
@@ -147,7 +164,8 @@ class PhotoCrop {
   };
 
   factory PhotoCrop.fromJson(Map<String, Object?> json) => PhotoCrop(
-    zoom: (json['zoom'] as num?)?.toDouble().clamp(minZoom, maxZoom).toDouble() ??
+    zoom:
+        (json['zoom'] as num?)?.toDouble().clamp(minZoom, maxZoom).toDouble() ??
         minZoom,
     offset: Offset(
       (json['dx'] as num?)?.toDouble() ?? 0,

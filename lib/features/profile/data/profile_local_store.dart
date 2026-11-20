@@ -76,7 +76,9 @@ class ProfileLocalStore {
     final writes = <PendingWrite>[];
     for (final raw in _outbox.values) {
       try {
-        final write = PendingWrite.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        final write = PendingWrite.fromJson(
+          jsonDecode(raw) as Map<String, dynamic>,
+        );
         if (write.userId == userId) writes.add(write);
       } catch (_) {
         // A corrupt entry must not wedge the queue forever.

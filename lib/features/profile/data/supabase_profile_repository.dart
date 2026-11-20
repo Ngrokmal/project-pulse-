@@ -198,7 +198,6 @@ class SupabaseProfileRepository implements ProfileRepository {
     }
   }
 
-
   // ────────────────────────────────────────────────────────── partial write
 
   @override
@@ -209,10 +208,7 @@ class SupabaseProfileRepository implements ProfileRepository {
     if (values.isEmpty) return;
     try {
       await _client.from('profiles').update(values).eq('id', userId);
-      _log.info(
-        'profile_patched',
-        data: {'columns': values.keys.join(',')},
-      );
+      _log.info('profile_patched', data: {'columns': values.keys.join(',')});
     } on AppFailure {
       rethrow;
     } catch (e) {
@@ -256,10 +252,7 @@ class SupabaseProfileRepository implements ProfileRepository {
       // StorageException carries a *string* status ("413"), unlike PostgREST's
       // int; parse it so the retry policy (>=500 retries) still works.
       final status = int.tryParse('${e.statusCode}');
-      throw ServerFailure(
-        statusCode: status,
-        safeCode: 'avatar_upload_failed',
-      );
+      throw ServerFailure(statusCode: status, safeCode: 'avatar_upload_failed');
     } on AppFailure {
       rethrow;
     } catch (e) {
@@ -314,15 +307,17 @@ class SupabaseProfileRepository implements ProfileRepository {
           .select('device_id, first_seen, last_seen, devices(platform)')
           .order('last_seen', ascending: false)
           .limit(20);
-      return rows.map((row) {
-        final device = row['devices'];
-        return AccountSession.fromMap(<String, dynamic>{
-          'device_id': row['device_id'],
-          'first_seen': row['first_seen'],
-          'last_seen': row['last_seen'],
-          'platform': device is Map ? device['platform'] : 'android',
-        });
-      }).toList(growable: false);
+      return rows
+          .map((row) {
+            final device = row['devices'];
+            return AccountSession.fromMap(<String, dynamic>{
+              'device_id': row['device_id'],
+              'first_seen': row['first_seen'],
+              'last_seen': row['last_seen'],
+              'platform': device is Map ? device['platform'] : 'android',
+            });
+          })
+          .toList(growable: false);
     } on AppFailure {
       rethrow;
     } catch (e) {
@@ -356,10 +351,13 @@ class SupabaseProfileRepository implements ProfileRepository {
     final me = _me;
     if (me == targetUserId) return;
     try {
-      await _client.from('blocks').upsert(<String, Object?>{
-        'blocker': me,
-        'blocked': targetUserId,
-      }, onConflict: 'blocker,blocked', ignoreDuplicates: true);
+      await _client
+          .from('blocks')
+          .upsert(
+            <String, Object?>{'blocker': me, 'blocked': targetUserId},
+            onConflict: 'blocker,blocked',
+            ignoreDuplicates: true,
+          );
       _log.info('user_blocked');
     } on AppFailure {
       rethrow;
@@ -439,7 +437,10 @@ class SupabaseProfileRepository implements ProfileRepository {
           .maybeSingle();
       final id = row?['id'] as String?;
       if (id == null) return; // nothing was ever said: nothing to clear
-      await _client.rpc('clear_conversation', params: <String, Object?>{'conv': id});
+      await _client.rpc(
+        'clear_conversation',
+        params: <String, Object?>{'conv': id},
+      );
       _log.info('chat_cleared');
     } on AppFailure {
       rethrow;

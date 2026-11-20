@@ -41,16 +41,28 @@ void main() {
         ProfileAction.whoSeesWhat,
         ProfileAction.devices,
       ]) {
-        expect(ProfileScopePlan.allows(ProfileViewMode.visitor, action), isFalse);
+        expect(
+          ProfileScopePlan.allows(ProfileViewMode.visitor, action),
+          isFalse,
+        );
       }
     });
 
     test('the primary label is short enough to never truncate at 390 px', () {
       for (final mode in ProfileViewMode.values) {
-        expect(ProfileScopePlan.primary(mode).label.length, lessThanOrEqualTo(14));
+        expect(
+          ProfileScopePlan.primary(mode).label.length,
+          lessThanOrEqualTo(14),
+        );
       }
-      expect(ProfileScopePlan.primary(ProfileViewMode.owner).label, 'Edit your card');
-      expect(ProfileScopePlan.primary(ProfileViewMode.visitor).label, 'Message');
+      expect(
+        ProfileScopePlan.primary(ProfileViewMode.owner).label,
+        'Edit your card',
+      );
+      expect(
+        ProfileScopePlan.primary(ProfileViewMode.visitor).label,
+        'Message',
+      );
     });
 
     test('quick actions are two, so the primary keeps its width', () {
@@ -120,7 +132,8 @@ void main() {
     test('the crop always stays inside the image', () {
       for (final size in [landscape, portrait]) {
         for (final zoom in [PhotoCrop.minZoom, 1.7, PhotoCrop.maxZoom]) {
-          final crop = PhotoCrop.identity.zoomedTo(zoom)
+          final crop = PhotoCrop.identity
+              .zoomedTo(zoom)
               .pannedBy(const Offset(400, -400), imageSize: size)
               .rebasedFor(size);
           final rect = crop.sourceRect(size);
