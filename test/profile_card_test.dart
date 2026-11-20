@@ -122,6 +122,18 @@ void main() {
       expect(time.clockAt(DateTime.utc(2026, 1, 1, 12, 0)), '12:00 PM');
     });
 
+    test('an offset is not a place, so it is not shown as one', () {
+      // Android reports "+06" for Dhaka; the tile must not print that.
+      final bare = ProfileTime.fromProfile(offsetMinutes: 360, label: '+06');
+      expect(bare!.displayAt(DateTime.utc(2026, 11, 14, 12, 11)), '6:11 PM');
+      // A real name is kept as-is.
+      final named = ProfileTime.fromProfile(offsetMinutes: 360, label: 'Dhaka');
+      expect(
+        named!.displayAt(DateTime.utc(2026, 11, 14, 12, 11)),
+        '6:11 PM · Dhaka',
+      );
+    });
+
     test('no stored offset falls back to the device zone', () {
       final fallback = ProfileTime.fromLocalDevice(DateTime(2026, 1, 1));
       expect(fallback.offsetMinutes, isA<int>());

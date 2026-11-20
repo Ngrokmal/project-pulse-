@@ -23,11 +23,10 @@ class ProfileTime {
 
   static ProfileTime? fromProfile({int? offsetMinutes, String? label}) {
     if (offsetMinutes == null) return null;
-    final clean = (label ?? '').trim();
-    return ProfileTime(
-      offsetMinutes: offsetMinutes,
-      label: clean.isEmpty ? null : clean,
-    );
+    // Stored labels are cleaned the same way as fresh ones, so a row written by
+    // an older build ("+06") cannot start showing an offset as a place.
+    final clean = _cleanZoneName(label ?? '');
+    return ProfileTime(offsetMinutes: offsetMinutes, label: clean);
   }
 
   /// `6:11 PM`, in the profile's own zone.
@@ -61,7 +60,11 @@ class ProfileTime {
   static String? _cleanZoneName(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return null;
+    // Android often reports an offset ("+06", "GMT+06:00") rather than a name,
+    // and an offset is not a place. Only something with letters survives — and
+    // never the generic GMT/UTC prefixes.
     if (trimmed.startsWith('GMT') || trimmed.startsWith('UTC')) return null;
+    if (!RegExp('[A-Za-z]').hasMatch(trimmed)) return null;
     return trimmed;
   }
 }
