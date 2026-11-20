@@ -401,6 +401,9 @@ class SupabaseChatRepository implements ChatRepository {
       return NetworkFailure(detail: '${e.code}: ${e.message}');
     }
     return switch (e.code) {
+      // The database's own refuse-to-write signal (migrations/0016). It is not
+      // a retryable error: the account is on hold and the app has to say so.
+      'PULSE' => const AccountSuspendedFailure(),
       '42501' => const ServerFailure(statusCode: 403, safeCode: 'not_allowed'),
       '23505' => const ServerFailure(safeCode: 'duplicate'),
       'PGRST116' => const ServerFailure(safeCode: 'not_found'),

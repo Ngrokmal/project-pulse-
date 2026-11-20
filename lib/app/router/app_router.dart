@@ -2,6 +2,10 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account_status/application/account_status_controller.dart';
+import '../../features/account_status/domain/account_status.dart';
+import '../../features/account_status/presentation/account_on_hold_screen.dart';
+import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
 import '../../features/calls/presentation/call_screen.dart';
@@ -19,9 +23,38 @@ import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
 import '../../features/shell/presentation/home_shell.dart';
 
+/// Where the app is allowed to be, given what the server says about the
+/// account. A hold is not a dialog somebody can swipe away: every location
+/// redirects to the notice, and the notice's own two actions are the only ways
+/// out of it.
+const accountHoldPath = '/account-on-hold';
+
 final routerProvider = Provider<GoRouter>((ref) {
+  // GoRouter re-evaluates `redirect` when this fires, and only then: the router
+  // itself must stay the same instance or the navigation stack is rebuilt.
+  final lockedSignal = ValueNotifier<bool>(
+    ref.read(accountLockProvider) != null,
+  );
+  ref.listen<AccountHold?>(accountLockProvider, (_, next) {
+    lockedSignal.value = next != null;
+  });
+  ref.onDispose(lockedSignal.dispose);
+
   return GoRouter(
     initialLocation: '/',
+    refreshListenable: lockedSignal,
+    redirect: (context, state) {
+      final locked = ref.read(accountLockProvider) != null;
+      final atNotice = state.matchedLocation == accountHoldPath;
+
+      if (locked && !atNotice) return accountHoldPath;
+      if (!locked && atNotice) {
+        return ref.read(authControllerProvider) is AuthSignedIn
+            ? '/app'
+            : '/welcome';
+      }
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/',
@@ -42,6 +75,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             startInSignup: state.uri.queryParameters['mode'] == 'signup',
           ),
         ),
+      ),
+      GoRoute(
+        path: accountHoldPath,
+        name: 'account-on-hold',
+        builder: (context, state) => const AccountOnHoldScreen(),
       ),
       GoRoute(
         path: '/update',

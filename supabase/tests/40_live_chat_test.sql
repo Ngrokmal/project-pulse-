@@ -150,8 +150,14 @@ begin
     insert into public.messages (conversation_id, sender_id, body)
     values ((select id from _ids where label='a1'), auth.uid(), 'banned talking');
     insert into _r (name, ok, detail) values ('banned account cannot send messages', false, 'allowed');
-  exception when insufficient_privilege then
-    insert into _r (name, ok, detail) values ('banned account cannot send messages', true, sqlerrm);
+  exception when others then
+    -- Either the row-level policy refuses the row (42501) or the table guard
+    -- that also covers definer functions does ('PULSE'). Both are refusals; a
+    -- test that only accepted one of them would have to be edited again the
+    -- next time the guard moves.
+    insert into _r (name, ok, detail)
+    values ('banned account cannot send messages', sqlstate in ('42501', 'PULSE'),
+            sqlstate || ': ' || sqlerrm);
   end;
 end $$;
 

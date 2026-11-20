@@ -130,6 +130,31 @@ Deno.serve(async (req: Request): Promise<Response> => {
     auth: { persistSession: false },
   });
 
+  // A held account receives nothing, from anyone, including this function.
+  // Suspending already deletes its tokens and refuses new ones (migrations/0016),
+  // so this is the third lock on the same door — the one that holds even if a
+  // token row somehow survives.
+  if (payload.userId) {
+    const { data: status, error: statusError } = await db
+      .from("account_status")
+      .select("suspended")
+      .eq("user_id", payload.userId)
+      .maybeSingle();
+    if (statusError && statusError.code !== "PGRST116") {
+      console.error(`[${correlationId}] status_lookup_failed`, statusError.code);
+      return json({ ok: false, error: "lookup_failed", correlationId }, 500);
+    }
+    if (status?.suspended === true) {
+      return json({
+        ok: true,
+        sent: 0,
+        failed: 0,
+        reason: "account_on_hold",
+        correlationId,
+      });
+    }
+  }
+
   let tokens: string[] = [];
   if (payload.token) {
     if (!isUsableToken(payload.token)) {

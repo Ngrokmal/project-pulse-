@@ -153,6 +153,48 @@ class UpdateFailure extends AppFailure {
   bool get isRetryable => true;
 }
 
+/// The server says this account may not act (§25).
+///
+/// It is not an error to retry: the same request will be refused until a human
+/// lifts the hold, so the UI must never offer "try again" for it — it shows the
+/// hold screen instead. `code` is the SQLSTATE the database guard raises, so a
+/// failure that crossed three layers still says exactly what happened.
+class AccountSuspendedFailure extends AppFailure {
+  const AccountSuspendedFailure({this.detail, super.correlationId});
+
+  final String? detail;
+
+  @override
+  String get code => 'account_suspended';
+
+  @override
+  String get userMessage =>
+      'This account is on hold, so nothing can be sent or received. '
+      'Open the notice to see why, or to ask a person to look again.';
+
+  @override
+  bool get isRetryable => false;
+}
+
+/// The account already has an appeal waiting.
+///
+/// The server enforces one open appeal per account (a partial unique index), so
+/// this is a real answer, not an error: the notice shows the receipt instead of
+/// asking the person to write the same sentences twice.
+class AppealAlreadyOpenFailure extends AppFailure {
+  const AppealAlreadyOpenFailure();
+
+  @override
+  String get code => 'appeal_already_open';
+
+  @override
+  String get userMessage =>
+      'An appeal from this account is already waiting to be read.';
+
+  @override
+  bool get isRetryable => false;
+}
+
 /// A feature whose backend half has not been applied yet.
 ///
 /// This exists so the Explore tab can say the true thing ("run 0010_friends.sql")

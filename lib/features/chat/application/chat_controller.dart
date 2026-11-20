@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../account_status/application/account_status_controller.dart';
 import '../../auth/application/auth_controller.dart';
 import '../data/chat_local_store.dart';
 import '../data/supabase_chat_repository.dart';
@@ -370,6 +371,13 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
       store?.dequeue(clientId);
       _replace(optimistic.id, saved);
       ref.read(conversationsProvider.notifier).refresh();
+    } on AccountSuspendedFailure {
+      // A held account must not queue a retry: the server would refuse every
+      // attempt, and an outbox that grows forever is a lie. Drop the bubble,
+      // drop the queue, and let the watchdog put the notice on screen.
+      _log.warning('send_refused_account_on_hold');
+      _remove(optimistic.id);
+      unawaited(ref.read(accountStatusControllerProvider.notifier).check());
     } on AppFailure catch (e) {
       _log.warning('send_failed', data: {'code': e.code});
       store?.enqueue(
@@ -398,6 +406,16 @@ class ChatThreadController extends AsyncNotifier<ChatThreadState> {
         optimistic.copyWith(delivery: DeliveryState.failed),
       );
     }
+  }
+
+  /// Takes a bubble away entirely — used when the server says the account may
+  /// not write at all, where "failed, retry?" would be the wrong offer.
+  void _remove(String id) {
+    final current = state.value;
+    if (current == null) return;
+    final list = current.messages.where((m) => m.id != id).toList();
+    state = AsyncData(current.copyWith(messages: list));
+    ChatLocalStore.instance?.cacheMessages(conversationId, list);
   }
 
   void _replace(String oldId, Message next) {

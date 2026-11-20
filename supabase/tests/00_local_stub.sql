@@ -38,6 +38,36 @@ begin
 end;
 $$;
 
+-- The two tables a suspension acts on. On Supabase, GoTrue cascades
+-- auth.refresh_tokens off auth.sessions, which is why deleting a session ends
+-- the login; the stub keeps the same foreign key so the behaviour is testable.
+create table if not exists auth.sessions (
+  id         uuid primary key,
+  user_id    uuid not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  aal        text
+);
+
+create table if not exists auth.refresh_tokens (
+  instance_id uuid,
+  id         bigserial primary key,
+  token      text,
+  user_id    text,
+  revoked    boolean default false,
+  session_id uuid references auth.sessions (id) on delete cascade
+);
+
+-- Supabase ships this publication (Realtime). Migrations that publish a table
+-- must be tested against it, not against its absence.
+do $$
+begin
+  if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    create publication supabase_realtime;
+  end if;
+end;
+$$;
+
 grant usage on schema auth to anon, authenticated, service_role;
 grant usage on schema public to anon, authenticated, service_role;
 grant select, insert, update, delete on auth.users to service_role;

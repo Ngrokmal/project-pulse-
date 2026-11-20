@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/config/app_config.dart';
 import '../core/logging/app_logger.dart';
 import '../core/theme/app_theme.dart';
+import '../features/account_status/application/account_status_controller.dart';
+import '../features/account_status/domain/account_status.dart';
 import '../features/calls/application/call_controller.dart';
 import '../features/chat/application/chat_controller.dart';
 import '../features/settings/domain/app_settings.dart';
@@ -40,6 +42,15 @@ class PulseApp extends ConsumerWidget {
       final value = next.value;
       if (value != null) reduceMotionNotifier.value = value.reduceMotion;
     });
+    // The account watchdog has to outlive every screen: a hold that lands while
+    // the person is typing in a chat must end the session there too, not only
+    // when they walk back to the shell (§25). `listen` keeps the provider alive
+    // without rebuilding the whole app on every poll.
+    ref.listen<AsyncValue<AccountStatusInfo?>>(
+      accountStatusControllerProvider,
+      (_, _) {},
+    );
+
     // Resuming after a long sleep means the caches are stale; refresh once,
     // throttled, so a flickering phone does not hammer the network (§9).
     if (ref.read(appLifecycleProvider) == AppLifecycleState.resumed) {
