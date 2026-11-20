@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:path_provider/path_provider.dart';
@@ -10,6 +9,9 @@ import 'package:path_provider/path_provider.dart';
 /// hash it was verified against, so the next launch can prove the file is still
 /// the right one by size and sidecar instead of hashing 30 MB on the splash
 /// screen — and never downloads it again.
+///
+/// Only the *download* is remembered. A dismissed prompt is deliberately not
+/// written here: "later" has to mean "not this time", not "not ever".
 class UpdateStore {
   UpdateStore(this.directory);
 
@@ -36,8 +38,6 @@ class UpdateStore {
 
   File _stampFile(int versionCode, String abi) =>
       File('${directory.path}/pulse-$versionCode-$abi.apk.ok');
-
-  File get _stateFile => File('${directory.path}/state.json');
 
   /// A previously finished download, if it is still exactly what the manifest
   /// describes.
@@ -94,33 +94,4 @@ class UpdateStore {
     }
   }
 
-  Future<int?> skippedVersionCode() async {
-    final state = await _readState();
-    final value = state['skippedVersionCode'];
-    return value is num ? value.toInt() : null;
-  }
-
-  Future<void> skipVersion(int versionCode) async {
-    final state = await _readState();
-    state['skippedVersionCode'] = versionCode;
-    await _stateFile.writeAsString(jsonEncode(state));
-  }
-
-  Future<void> clearSkip() async {
-    final state = await _readState();
-    state.remove('skippedVersionCode');
-    await _stateFile.writeAsString(jsonEncode(state));
-  }
-
-  Future<Map<String, Object?>> _readState() async {
-    try {
-      if (!_stateFile.existsSync()) return <String, Object?>{};
-      final decoded = jsonDecode(_stateFile.readAsStringSync());
-      return decoded is Map<String, dynamic>
-          ? Map<String, Object?>.from(decoded)
-          : <String, Object?>{};
-    } on Object {
-      return <String, Object?>{};
-    }
-  }
 }

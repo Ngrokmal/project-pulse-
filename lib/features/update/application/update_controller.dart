@@ -70,7 +70,9 @@ class UpdateState {
   /// False while Android still needs the "install unknown apps" permission.
   final bool canInstall;
 
-  /// The user pressed *later* for this exact build.
+  /// The user pressed *later* for this exact build — **in this run of the app
+  /// only**. It is never written to disk, so the next launch (or the next time
+  /// the app comes back to the front) asks again.
   final bool skipped;
 
   /// 0…1, or `null` when the server did not send a content length.
@@ -298,7 +300,10 @@ class UpdateController extends Notifier<UpdateState> {
       sha256: variant.sha256,
       sizeBytes: variant.sizeBytes,
     );
-    final skipped = await store.skippedVersionCode();
+    // A dismissal only ever applies to the build it was given for, and only
+    // while this app session is alive.
+    final skipped =
+        state.skipped && state.update?.versionCode == latest.versionCode;
 
     state = UpdateState(
       phase: reusable == null ? UpdatePhase.available : UpdatePhase.ready,
@@ -308,7 +313,7 @@ class UpdateController extends Notifier<UpdateState> {
       total: variant.sizeBytes,
       received: reusable == null ? 0 : variant.sizeBytes,
       canInstall: canInstall,
-      skipped: skipped == latest.versionCode,
+      skipped: skipped,
     );
   }
 
@@ -457,13 +462,27 @@ class UpdateController extends Notifier<UpdateState> {
     state = state.copyWith(canInstall: canInstall, clearMessage: canInstall);
   }
 
-  /// "Later": this build stops interrupting launches until a newer one appears.
+  /// "Later": quiet until the app is left and entered again.
+  ///
+  /// Nothing is written to disk on purpose. The rule the user asked for is
+  /// **every launch asks**: tapping *Now now / Later* may get you into the app
+  /// this time, but the next time the app is opened — or brought back to the
+  /// front — the update page is offered again until it is installed.
   Future<void> remindLater() async {
-    final code = state.update?.versionCode;
-    if (code == null) return;
-    final store = await ref.read(updateStoreProvider.future);
-    await store.skipVersion(code);
+    if (state.update == null) return;
     state = state.copyWith(skipped: true, clearMessage: true);
+  }
+
+  /// Called whenever the app returns to the foreground.
+  ///
+  /// Re-arms the prompt (clearing any "later" pressed earlier in the session)
+  /// and asks the release channel again, so an APK that was downloaded but not
+  /// installed is offered immediately rather than silently.
+  Future<void> reconsiderOnReturn() async {
+    if (!AppConfig.updatesEnabled) return;
+    if (state.isWorking) return;
+    if (state.skipped) state = state.copyWith(skipped: false);
+    await check();
   }
 
   /// Called from the page once a build has actually been installed.
@@ -471,7 +490,6 @@ class UpdateController extends Notifier<UpdateState> {
     final code = state.update?.versionCode;
     final store = await ref.read(updateStoreProvider.future);
     if (code != null) store.discard(code, deviceAbiKey());
-    await store.clearSkip();
     state = const UpdateState();
   }
 
