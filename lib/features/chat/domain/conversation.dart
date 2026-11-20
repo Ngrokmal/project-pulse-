@@ -28,7 +28,12 @@ class ChatPeer {
         ? map['display_name'] as String
         : 'Pulse user',
     username: map['username'] as String?,
-    avatarUrl: map['avatar_url'] as String?,
+    // `photo_visible = false` means the photo is not delivered anywhere — the
+    // chat list included. The name and the initials still arrive; the picture
+    // does not, so hiding it means hiding it.
+    avatarUrl: map['photo_visible'] == false
+        ? null
+        : map['avatar_url'] as String?,
   );
 }
 

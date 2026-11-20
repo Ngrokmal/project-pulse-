@@ -37,7 +37,7 @@ class SupabaseChatRepository implements ChatRepository {
           .select(
             'id, kind, title, last_message_at, last_message_preview, last_message_sender, '
             'conversation_members(user_id, role, last_read_at, '
-            'profiles(id, display_name, username, avatar_url))',
+            'profiles(id, display_name, username, avatar_url, photo_visible))',
           )
           .order('last_message_at', ascending: false, nullsFirst: false);
       return rows
@@ -227,7 +227,7 @@ class SupabaseChatRepository implements ChatRepository {
     try {
       final rows = await _client
           .from('profiles')
-          .select('id, display_name, username, avatar_url')
+          .select('id, display_name, username, avatar_url, photo_visible')
           .neq('id', _me)
           .order('display_name')
           .limit(100);
@@ -240,7 +240,10 @@ class SupabaseChatRepository implements ChatRepository {
                   ? r['display_name'] as String
                   : 'Pulse user',
               username: r['username'] as String?,
-              avatarUrl: r['avatar_url'] as String?,
+              // Hidden means hidden, here too.
+              avatarUrl: r['photo_visible'] == false
+                  ? null
+                  : r['avatar_url'] as String?,
             ),
           )
           .toList();

@@ -147,7 +147,7 @@ class SupabaseExploreRepository implements ExploreRepository {
     try {
       final rows = await _client
           .from('profiles')
-          .select('id, display_name, username, avatar_url')
+          .select('id, display_name, username, avatar_url, photo_visible')
           .neq('id', me ?? '')
           .limit(300)
           .timeout(_timeout);

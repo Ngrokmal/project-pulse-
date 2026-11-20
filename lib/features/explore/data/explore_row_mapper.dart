@@ -40,7 +40,11 @@ class ExploreRowMapper {
       id: id,
       displayName: _text(row['display_name']),
       handle: _nullableText(row['username']),
-      avatarUrl: _nullableText(row['avatar_url']),
+      // A hidden photo is not delivered anywhere; every face in the app obeys
+      // the same column.
+      avatarUrl: row['photo_visible'] == false
+          ? null
+          : _nullableText(row['avatar_url']),
       presence: Presence(lastSeenAt: _time(row['last_seen_at'])),
       mutualCount: _int(row['mutual_count']),
       friendsSince: _time(row['friends_since']),
