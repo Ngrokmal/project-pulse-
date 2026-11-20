@@ -125,10 +125,14 @@ class UpdateStore {
     }
 
     try {
+      // The length is taken *before* the move: after `renameSync` the part file
+      // no longer exists, and asking it for its size throws — which is how a
+      // perfectly good download was reported as "could not save".
+      final expectedLength = part.lengthSync();
       final finalFile = apkFile(build, abi);
       if (finalFile.existsSync()) finalFile.deleteSync();
       final moved = part.renameSync(finalFile.path);
-      if (!moved.existsSync() || moved.lengthSync() != part.lengthSync()) {
+      if (!moved.existsSync() || moved.lengthSync() != expectedLength) {
         throw const UpdateFailure(
           'file_move_failed',
           'The file could not be put where Android expects it. Tap Download '
