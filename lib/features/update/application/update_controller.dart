@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ffi' show Abi;
 import 'dart:io';
 
@@ -220,6 +221,13 @@ final updateHttpClientProvider = Provider<http.Client Function()>(
 class UpdateController extends Notifier<UpdateState> {
   http.Client? _downloadClient;
 
+  /// The ask that is currently on the wire, if any.
+  ///
+  /// Two callers want the answer at launch — the splash screen and the
+  /// heartbeat that runs inside the app — and the second one must not open a
+  /// second connection to the release channel. Both await this future.
+  Future<void>? _inFlight;
+
   @override
   UpdateState build() {
     ref.onDispose(() {
@@ -232,28 +240,47 @@ class UpdateController extends Notifier<UpdateState> {
   UpdateRepository get _repository => ref.read(updateRepositoryProvider);
   ApkInstaller get _installer => ref.read(apkInstallerProvider);
 
-  /// Called once, from the splash screen. Returns when it is done or when its
-  /// budget runs out — whichever comes first.
+  /// Called from the splash screen. Returns when it is done or when its budget
+  /// runs out — whichever comes first.
+  ///
+  /// Two seconds is deliberate: the launch never waits on a network it does not
+  /// control. A check that misses the budget is **not cancelled** — it keeps
+  /// running and lands its result on the home screen, where the heartbeat is
+  /// already asking again.
   Future<void> checkAtBoot({
-    Duration budget = const Duration(milliseconds: 2500),
+    Duration budget = const Duration(seconds: 2),
   }) async {
     if (!AppConfig.updatesEnabled) return;
+    if (state.phase == UpdatePhase.checking) return;
     state = state.copyWith(phase: UpdatePhase.checking, clearMessage: true);
     try {
-      await _check().timeout(budget);
+      await _run().timeout(budget);
     } on Object {
-      // Silent: an update check must never be the reason a launch fails.
+      // Silent: an update check must never be the reason a launch fails. Leave
+      // the phase alone if the ask finished while we were giving up on it.
       if (state.phase == UpdatePhase.checking) {
         state = state.copyWith(phase: UpdatePhase.idle);
       }
     }
   }
 
-  /// An explicit check (used by the update page's retry and by Settings).
-  Future<void> check() async {
+  /// An explicit check (the update page's retry, Settings, the heartbeat).
+  ///
+  /// [budget] bounds how long the caller waits, not how long the ask lives: a
+  /// slow manifest still lands when it arrives, so a flaky connection costs a
+  /// delay rather than a lost update.
+  Future<void> check({Duration? budget}) async {
     state = state.copyWith(phase: UpdatePhase.checking, clearMessage: true);
     try {
-      await _check();
+      final ask = _run();
+      if (budget == null) {
+        await ask;
+      } else {
+        await ask.timeout(budget);
+      }
+    } on TimeoutException {
+      // Still on the wire — the phase stays `checking` and the next beat joins
+      // the same future rather than starting over.
     } on AppFailure catch (failure) {
       state = state.copyWith(
         phase: UpdatePhase.failed,
@@ -265,6 +292,21 @@ class UpdateController extends Notifier<UpdateState> {
         message: 'Could not reach the release channel.',
       );
     }
+  }
+
+  /// One ask, shared by everyone who wants the answer.
+  Future<void> _run() {
+    final running = _inFlight;
+    if (running != null) return running;
+    late final Future<void> ask;
+    ask = _check().whenComplete(() {
+      if (identical(_inFlight, ask)) _inFlight = null;
+    });
+    // A caller that gives up on the budget stops listening; without this the
+    // shared future's failure would surface as an unhandled zone error.
+    unawaited(ask.catchError((Object _) {}));
+    _inFlight = ask;
+    return ask;
   }
 
   Future<void> _check() async {

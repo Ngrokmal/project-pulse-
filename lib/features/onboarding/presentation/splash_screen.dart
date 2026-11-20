@@ -56,8 +56,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
     // Restore session (never throws) — done in parallel with the animation.
     // Is there a newer build? The question is asked *alongside* the session
-    // restore, not after it, and it gives up after 2.5 s: an update may interrupt
-    // a launch, but a slow release channel never may.
+    // restore, not after it, and it gives up after two seconds: an update may
+    // interrupt a launch, but a slow release channel never may. Whatever this
+    // ask misses is picked up by the heartbeat on the other side of the splash,
+    // so the two together are faster *and* more forgiving than either alone.
     final updateCheck = ref
         .read(updateControllerProvider.notifier)
         .checkAtBoot();
