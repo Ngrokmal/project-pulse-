@@ -11,6 +11,7 @@ import '../../features/update/presentation/update_screen.dart';
 import '../../features/chat/presentation/create_group_screen.dart';
 import '../../features/force_audio/presentation/force_audio_screen.dart';
 import '../../features/diagnostics/presentation/connection_screen.dart';
+import '../../features/profile/presentation/blocked_people_screen.dart';
 import '../../features/profile/presentation/edit_profile_screen.dart';
 import '../../features/onboarding/presentation/splash_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
@@ -88,6 +89,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'edit-profile',
         pageBuilder: (context, state) =>
             _fade(state, const EditProfileScreen()),
+      ),
+      GoRoute(
+        path: '/blocked',
+        name: 'blocked',
+        pageBuilder: (context, state) =>
+            _fade(state, const BlockedPeopleScreen()),
       ),
       GoRoute(
         path: '/connection',

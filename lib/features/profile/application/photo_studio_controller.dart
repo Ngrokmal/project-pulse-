@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error/app_failure.dart';
 import '../data/profile_photo_rasterizer.dart';
+import '../../chat/application/chat_controller.dart';
+import '../../explore/application/explore_providers.dart';
 import '../domain/profile_photo.dart';
 import 'profile_controller.dart';
 
@@ -118,6 +120,7 @@ class PhotoStudioController extends Notifier<PhotoStudioState> {
             takenAt: DateTime.now(),
           );
       ref.read(profileControllerProvider.notifier).applyAvatar(url);
+      _spreadThePhoto();
       state = const PhotoStudioState();
       return null;
     } on AppFailure catch (f) {
@@ -132,6 +135,14 @@ class PhotoStudioController extends Notifier<PhotoStudioState> {
     }
   }
 
+  /// The photo lives in one column, so every list that paints a face has to be
+  /// told the column moved — otherwise the card shows the new picture while the
+  /// chat list keeps the old one until the next launch.
+  void _spreadThePhoto() {
+    ref.invalidate(conversationsProvider);
+    ref.invalidate(friendsProvider);
+  }
+
   /// Back to initials. Also clears the column, so nobody is left looking at a
   /// photo its owner believes they removed.
   Future<AppFailure?> remove({
@@ -144,6 +155,7 @@ class PhotoStudioController extends Notifier<PhotoStudioState> {
           .read(profileRepositoryProvider)
           .removeAvatar(userId: userId, existingUrl: existingUrl);
       ref.read(profileControllerProvider.notifier).applyAvatar(null);
+      _spreadThePhoto();
       state = const PhotoStudioState();
       return null;
     } on AppFailure catch (f) {

@@ -257,7 +257,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       case ProfileLens.people:
         final faces = <PeopleFace>[
           for (final (index, person) in friends.take(4).indexed)
-            PeopleFace(initials: person.initials, tone: index),
+            PeopleFace(
+              initials: person.initials,
+              tone: index,
+              imageUrl: person.avatarUrl,
+            ),
         ];
         final circles = <PeopleCircle>[
           for (final conversation
@@ -323,6 +327,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           sessions: ref.watch(profileSessionsProvider),
           sessionsNow: DateTime.now(),
           onSignOutOthers: _signOutOthers,
+          onBlockedPeople: () => context.push('/blocked'),
           onConnection: () => context.push('/connection'),
           onAbout: _about,
           onLogout: _logout,

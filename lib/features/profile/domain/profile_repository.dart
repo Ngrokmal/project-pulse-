@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'account_session.dart';
+import 'blocked_person.dart';
 import 'profile.dart';
 import 'profile_media.dart';
 import 'profile_privacy.dart';
@@ -74,6 +75,9 @@ abstract class ProfileRepository {
 
   /// True when this account has blocked [targetUserId].
   Future<bool> hasBlocked(String targetUserId);
+
+  /// Everyone this account has blocked, newest first (0014).
+  Future<List<BlockedPerson>> blockedPeople();
 
   Future<void> reportUser({
     required String targetUserId,

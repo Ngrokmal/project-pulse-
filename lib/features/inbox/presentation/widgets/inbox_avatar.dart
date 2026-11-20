@@ -20,12 +20,20 @@ class InboxAvatar extends StatefulWidget {
     required this.initials,
     required this.seed,
     required this.presence,
+    this.imageUrl,
     this.size = 42,
     this.onTap,
   });
 
   final String initials;
+
+  /// Fallback identity: a stable gradient when there is no photo.
   final String seed;
+
+  /// The person's actual picture. When it is here it is what gets painted —
+  /// the gradient and the initials are what the corner shows while it loads,
+  /// or if it cannot be fetched.
+  final String? imageUrl;
   final AvatarPresence presence;
   final double size;
   final VoidCallback? onTap;
@@ -134,6 +142,7 @@ class _InboxAvatarState extends State<InboxAvatar>
               child: _AvatarFace(
                 initials: widget.initials,
                 seed: widget.seed,
+                imageUrl: widget.imageUrl,
                 size: widget.size,
                 radius: radius,
               ),
@@ -178,12 +187,14 @@ class _AvatarFace extends StatelessWidget {
   const _AvatarFace({
     required this.initials,
     required this.seed,
+    required this.imageUrl,
     required this.size,
     required this.radius,
   });
 
   final String initials;
   final String seed;
+  final String? imageUrl;
   final double size;
   final double radius;
 
@@ -204,14 +215,62 @@ class _AvatarFace extends StatelessWidget {
           ),
         ],
       ),
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: size * 0.34,
-          fontWeight: FontWeight.w800,
-          height: 1,
-        ),
+      child: _FaceContent(
+        initials: initials,
+        imageUrl: imageUrl,
+        size: size,
+        radius: radius,
+      ),
+    );
+  }
+}
+
+/// The photo, or the initials it falls back to. Clipped to the same shape as
+/// the tile so a portrait never leaks past its rounded corner.
+class _FaceContent extends StatelessWidget {
+  const _FaceContent({
+    required this.initials,
+    required this.imageUrl,
+    required this.size,
+    required this.radius,
+  });
+
+  final String initials;
+  final String? imageUrl;
+  final double size;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = imageUrl?.trim();
+    final text = Text(
+      initials,
+      style: TextStyle(
+        color: Colors.white,
+        fontSize: size * 0.34,
+        fontWeight: FontWeight.w800,
+        height: 1,
+      ),
+    );
+    if (url == null || url.isEmpty) return text;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(radius),
+      child: Image.network(
+        url,
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        // The initials are painted underneath, so a slow or failed fetch shows
+        // the person rather than an empty tile or a broken icon.
+        frameBuilder: (context, child, frame, syncLoaded) {
+          if (syncLoaded || frame != null) return child;
+          return Stack(
+            alignment: Alignment.center,
+            children: [text, const SizedBox.shrink()],
+          );
+        },
+        errorBuilder: (_, _, _) => Center(child: text),
       ),
     );
   }

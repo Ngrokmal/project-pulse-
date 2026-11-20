@@ -112,6 +112,7 @@ class InboxHeader extends StatelessWidget {
           const SizedBox(width: 4),
           InboxAvatar(
             initials: _initials,
+            imageUrl: conversation?.avatarUrl,
             seed: _seed,
             presence: avatarPresence,
             onTap: onProfile,

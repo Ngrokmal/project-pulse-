@@ -22,9 +22,12 @@ class PeopleCircle {
 
 /// One face in the stack of people.
 class PeopleFace {
-  const PeopleFace({required this.initials, required this.tone});
+  const PeopleFace({required this.initials, required this.tone, this.imageUrl});
 
   final String initials;
+
+  /// Their real photo, when they have one. The initials stay as the fallback.
+  final String? imageUrl;
 
   /// 0…3 — which gradient of the four brand pairs this face wears.
   final int tone;
@@ -181,17 +184,44 @@ class _FaceStack extends StatelessWidget {
                   ),
                   border: Border.all(color: AppColors.card, width: 2.4),
                 ),
-                child: Text(
-                  face.initials,
-                  style: AppTypography.micro.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11.5,
-                  ),
-                ),
+                child: _FaceContent(face: face, diameter: diameter),
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// A face in the stack: photo if there is one, initials if not.
+class _FaceContent extends StatelessWidget {
+  const _FaceContent({required this.face, required this.diameter});
+
+  final PeopleFace face;
+  final double diameter;
+
+  @override
+  Widget build(BuildContext context) {
+    final initials = Text(
+      face.initials,
+      style: AppTypography.micro.copyWith(
+        color: Colors.white,
+        fontWeight: FontWeight.w700,
+        fontSize: 11.5,
+      ),
+    );
+    final url = face.imageUrl?.trim();
+    if (url == null || url.isEmpty) return initials;
+
+    return ClipOval(
+      child: Image.network(
+        url,
+        width: diameter - 4.8,
+        height: diameter - 4.8,
+        fit: BoxFit.cover,
+        frameBuilder: (context, child, frame, syncLoaded) =>
+            syncLoaded || frame != null ? child : initials,
+        errorBuilder: (_, _, _) => initials,
       ),
     );
   }

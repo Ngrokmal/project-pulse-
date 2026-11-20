@@ -264,6 +264,7 @@ void main() {
                 sessions: const AsyncValue.data(<AccountSession>[]),
                 sessionsNow: DateTime(2026, 11, 14),
                 onSignOutOthers: () async {},
+                onBlockedPeople: () {},
                 onConnection: () {},
                 onAbout: () {},
                 onLogout: () {},

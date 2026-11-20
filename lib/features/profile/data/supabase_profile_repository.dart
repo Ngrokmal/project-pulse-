@@ -5,6 +5,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../core/error/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
 import '../domain/account_session.dart';
+import '../domain/blocked_person.dart';
 import '../domain/profile.dart';
 import '../domain/profile_media.dart';
 import '../domain/profile_photo.dart';
@@ -379,6 +380,24 @@ class SupabaseProfileRepository implements ProfileRepository {
       rethrow;
     } catch (e) {
       throw _map(e, 'unblock_user');
+    }
+  }
+
+  @override
+  @override
+  Future<List<BlockedPerson>> blockedPeople() async {
+    if (_client.auth.currentUser == null) return const <BlockedPerson>[];
+    try {
+      final rows = await _client.rpc<dynamic>('blocked_people');
+      final list = rows is List ? rows : const <dynamic>[];
+      return [
+        for (final row in list)
+          if (row is Map) BlockedPerson.fromMap(Map<String, dynamic>.from(row)),
+      ];
+    } on AppFailure {
+      rethrow;
+    } catch (e) {
+      throw _map(e, 'blocked_people');
     }
   }
 

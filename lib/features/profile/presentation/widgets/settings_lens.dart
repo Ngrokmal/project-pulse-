@@ -25,6 +25,7 @@ class PrivacyLens extends StatelessWidget {
     required this.sessions,
     required this.sessionsNow,
     required this.onSignOutOthers,
+    required this.onBlockedPeople,
     required this.onConnection,
     required this.onAbout,
     required this.onLogout,
@@ -40,6 +41,9 @@ class PrivacyLens extends StatelessWidget {
   final AsyncValue<List<AccountSession>> sessions;
   final DateTime sessionsNow;
   final Future<void> Function() onSignOutOthers;
+
+  /// Opens the Blocked people page.
+  final VoidCallback onBlockedPeople;
 
   final VoidCallback onConnection;
   final VoidCallback onAbout;
@@ -88,6 +92,19 @@ class PrivacyLens extends StatelessWidget {
               PrivacyField.chatLock,
               Icons.lock_outline_rounded,
               'Behind your fingerprint',
+            ),
+          ],
+        ),
+        const PulseEyebrow('SAFETY'),
+        PulseRowStack(
+          children: [
+            PulseRow(
+              icon: Icons.block_rounded,
+              tone: PulseTone.bad,
+              title: 'Blocked people',
+              subtitle: 'Who you have blocked, and the way back',
+              trailing: const PulseChevron(),
+              onTap: onBlockedPeople,
             ),
           ],
         ),

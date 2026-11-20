@@ -63,6 +63,13 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+    // The header paints the other person's photo, and a face can change while
+    // this device is sitting in a chat list. One refresh on the way in means
+    // the avatar is never a launch-old snapshot.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(conversationsProvider.notifier).refresh();
+    });
   }
 
   @override

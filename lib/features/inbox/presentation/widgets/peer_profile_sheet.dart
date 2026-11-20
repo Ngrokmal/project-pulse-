@@ -9,6 +9,7 @@ import '../../../chat/application/chat_controller.dart';
 import '../../../chat/domain/chat_repository.dart';
 import '../../../chat/domain/conversation.dart';
 import '../../../presence/application/presence_controller.dart';
+import '../../../profile/application/blocked_people_controller.dart';
 import '../../../profile/application/safety_controller.dart';
 import '../../../profile/domain/safety_action.dart';
 import '../../../presence/domain/presence.dart';
@@ -126,7 +127,8 @@ class _PeerProfileSheetState extends ConsumerState<PeerProfileSheet> {
                 blur: 0,
                 child: _ProfileAvatar(
                   initials: conversation.initials,
-                  seed: conversation.avatarUrl ?? conversation.id,
+                  seed: conversation.id,
+                  imageUrl: conversation.avatarUrl,
                   online: online,
                 ),
               ),
@@ -371,10 +373,12 @@ class _ProfileAvatar extends StatefulWidget {
     required this.initials,
     required this.seed,
     required this.online,
+    this.imageUrl,
   });
 
   final String initials;
   final String seed;
+  final String? imageUrl;
   final bool online;
 
   @override
@@ -383,6 +387,30 @@ class _ProfileAvatar extends StatefulWidget {
 
 class _ProfileAvatarState extends State<_ProfileAvatar>
     with TickerProviderStateMixin {
+  Widget _initialsFace() => Center(
+    child: Text(
+      widget.initials,
+      style: const TextStyle(
+        fontSize: 33,
+        height: 1,
+        fontWeight: FontWeight.w800,
+        color: Colors.white,
+      ),
+    ),
+  );
+
+  Widget _photoOrInitials() {
+    final url = widget.imageUrl?.trim();
+    if (url == null || url.isEmpty) return _initialsFace();
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      frameBuilder: (context, child, frame, syncLoaded) =>
+          syncLoaded || frame != null ? child : _initialsFace(),
+      errorBuilder: (_, _, _) => _initialsFace(),
+    );
+  }
+
   late final AnimationController _ring = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 5600),
@@ -445,14 +473,11 @@ class _ProfileAvatarState extends State<_ProfileAvatar>
                 ),
               ],
             ),
-            child: Text(
-              widget.initials,
-              style: const TextStyle(
-                fontSize: 33,
-                height: 1,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-              ),
+            // The photo, on the same rounded plate — with the initials kept
+            // underneath so a slow fetch never shows an empty card.
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: SizedBox(width: 96, height: 96, child: _photoOrInitials()),
             ),
           ),
           Positioned(
@@ -685,6 +710,10 @@ class _SafetyRow extends ConsumerWidget {
         .read(safetyControllerProvider.notifier)
         .run(action, targetUserId: peerId);
     if (!context.mounted) return;
+    if (failure == null && action == SafetyAction.block) {
+      // The Blocked people page is the record of exactly this row.
+      ref.invalidate(blockedPeopleProvider);
+    }
     _say(context, failure == null ? action.doneLabel : failure.userMessage);
     if (failure == null) Navigator.of(context).maybePop();
   }
