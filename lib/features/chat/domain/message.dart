@@ -37,6 +37,7 @@ class Message {
     this.mediaBytes,
     this.durationMs,
     this.clientId,
+    this.creationRevision,
     this.isDeleted = false,
     this.delivery = DeliveryState.sent,
   });
@@ -55,6 +56,9 @@ class Message {
   final int? mediaBytes;
   final int? durationMs;
   final String? clientId;
+
+  /// Journal revision when this exact message incarnation was created.
+  final int? creationRevision;
   final bool isDeleted;
   final DeliveryState delivery;
 
@@ -73,6 +77,7 @@ class Message {
     mediaBytes: (map['media_bytes'] as num?)?.toInt(),
     durationMs: (map['duration_ms'] as num?)?.toInt(),
     clientId: map['client_id'] as String?,
+    creationRevision: (map['creation_revision'] as num?)?.toInt(),
     isDeleted: map['deleted_at'] != null,
   );
 
@@ -90,26 +95,32 @@ class Message {
     'media_bytes': mediaBytes,
     'duration_ms': durationMs,
     'client_id': clientId,
+    'creation_revision': creationRevision,
     'deleted_at': isDeleted ? createdAt.toUtc().toIso8601String() : null,
   };
 
-  Message copyWith({DeliveryState? delivery, String? id, bool? isDeleted}) =>
-      Message(
-        id: id ?? this.id,
-        conversationId: conversationId,
-        senderId: senderId,
-        kind: kind,
-        createdAt: createdAt,
-        body: body,
-        mediaUrl: mediaUrl,
-        mediaThumbUrl: mediaThumbUrl,
-        mediaName: mediaName,
-        mediaBytes: mediaBytes,
-        durationMs: durationMs,
-        clientId: clientId,
-        isDeleted: isDeleted ?? this.isDeleted,
-        delivery: delivery ?? this.delivery,
-      );
+  Message copyWith({
+    DeliveryState? delivery,
+    String? id,
+    bool? isDeleted,
+    int? creationRevision,
+  }) => Message(
+    id: id ?? this.id,
+    conversationId: conversationId,
+    senderId: senderId,
+    kind: kind,
+    createdAt: createdAt,
+    body: body,
+    mediaUrl: mediaUrl,
+    mediaThumbUrl: mediaThumbUrl,
+    mediaName: mediaName,
+    mediaBytes: mediaBytes,
+    durationMs: durationMs,
+    clientId: clientId,
+    creationRevision: creationRevision ?? this.creationRevision,
+    isDeleted: isDeleted ?? this.isDeleted,
+    delivery: delivery ?? this.delivery,
+  );
 
   /// What to show in a conversation list preview.
   String get preview => switch (kind) {

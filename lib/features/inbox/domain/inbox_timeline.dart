@@ -39,6 +39,7 @@ List<InboxCell> buildInboxTimeline(
   List<Message> messages, {
   required String myId,
   DateTime? peerLastReadAt,
+  int? peerLastReadRevision,
 }) {
   if (messages.isEmpty) return const [];
   const stackWindow = Duration(minutes: 2);
@@ -62,7 +63,11 @@ List<InboxCell> buildInboxTimeline(
       InboxCell(
         message: message,
         mine: mine,
-        delivery: resolveInboxDelivery(message, peerLastReadAt: peerLastReadAt),
+        delivery: resolveInboxDelivery(
+          message,
+          peerLastReadAt: peerLastReadAt,
+          peerLastReadRevision: peerLastReadRevision,
+        ),
         showDay: showDay,
         stackPrev: stackPrev,
         stackNext: stackNext,

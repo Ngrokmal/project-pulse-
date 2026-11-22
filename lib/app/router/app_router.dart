@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/account_status/application/account_status_controller.dart';
 import '../../features/account_status/domain/account_status.dart';
 import '../../features/account_status/presentation/account_on_hold_screen.dart';
+import '../../features/admin/presentation/admin_screen.dart';
 import '../../features/auth/application/auth_controller.dart';
 import '../../features/auth/presentation/auth_screen.dart';
 import '../../features/dev/presentation/design_gallery.dart';
@@ -80,6 +81,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: accountHoldPath,
         name: 'account-on-hold',
         builder: (context, state) => const AccountOnHoldScreen(),
+      ),
+      GoRoute(
+        path: '/admin',
+        name: 'admin',
+        builder: (context, state) => const AdminScreen(),
       ),
       GoRoute(
         path: '/update',

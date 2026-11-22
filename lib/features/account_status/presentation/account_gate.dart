@@ -25,6 +25,8 @@ class AccountGate extends ConsumerWidget {
 
     final status = ref.watch(accountStatusControllerProvider);
     return status.when(
+      skipLoadingOnRefresh: false,
+      skipLoadingOnReload: false,
       loading: () =>
           const Scaffold(body: PulseLoading(message: 'Checking your account')),
       error: (error, _) => Scaffold(

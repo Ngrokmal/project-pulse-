@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../../core/error/app_failure.dart';
 import '../../../core/logging/app_logger.dart';
+import '../../auth/application/auth_controller.dart';
 import '../../chat/application/chat_controller.dart';
 import '../../media/data/cloudinary_uploader.dart';
 import '../../media/domain/media_asset.dart';
@@ -86,6 +87,7 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
 
   Timer? _ticker;
   StreamSubscription<double>? _levels;
+  AuthSignedIn? _recordingSession;
 
   @override
   ForceAudioComposerState build() {
@@ -104,7 +106,19 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
 
   Future<void> start() async {
     if (state.isRecording) return;
-    final granted = await _recorder.ensurePermission();
+    final session = ref.read(authControllerProvider);
+    if (session is! AuthSignedIn) {
+      state = state.copyWith(
+        stage: ComposerStage.failed,
+        error: 'Please sign in again.',
+      );
+      return;
+    }
+    bool sameSession() =>
+        ref.mounted && identical(ref.read(authControllerProvider), session);
+    final recorder = _recorder;
+    final granted = await recorder.ensurePermission();
+    if (!sameSession()) return;
     if (!granted) {
       state = const ForceAudioComposerState(
         stage: ComposerStage.denied,
@@ -119,16 +133,27 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
     final path =
         '${dir.path}/pulse_fa_${DateTime.now().millisecondsSinceEpoch}.m4a';
     try {
-      await _recorder.start(path);
+      await recorder.start(path);
     } on Object catch (e) {
       _log.error('record_start_failed', error: e);
-      state = const ForceAudioComposerState(
-        stage: ComposerStage.failed,
-        error: 'Could not start recording. Close other audio apps and retry.',
-      );
+      if (sameSession()) {
+        state = const ForceAudioComposerState(
+          stage: ComposerStage.failed,
+          error: 'Could not start recording. Close other audio apps and retry.',
+        );
+      }
       return;
     }
-
+    if (!sameSession()) {
+      // Keep any recorded file for recovery; never deliver it as another user.
+      try {
+        await recorder.stop();
+      } catch (_) {
+        _log.warning('record_stop_failed');
+      }
+      return;
+    }
+    _recordingSession = session;
     _log.info('record_start');
     state = ForceAudioComposerState(stage: ComposerStage.recording, path: path);
     _levels = _recorder.amplitude(const Duration(milliseconds: 120)).listen((
@@ -197,7 +222,25 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
   Future<void> send() async {
     final path = state.path;
     if (path == null || state.stage != ComposerStage.recorded) return;
-
+    final session = ref.read(authControllerProvider);
+    if (session is! AuthSignedIn) {
+      state = state.copyWith(
+        stage: ComposerStage.failed,
+        error: 'Please sign in again.',
+      );
+      return;
+    }
+    if (!identical(_recordingSession, session)) {
+      state = const ForceAudioComposerState(
+        stage: ComposerStage.failed,
+        error: 'Account changed. Start a new recording in this account.',
+      );
+      return;
+    }
+    // Identity catches sign-out/sign-in even if the same account returns.
+    // Do not read ref or mutate state after the provider is disposed.
+    bool sameSession() =>
+        ref.mounted && identical(ref.read(authControllerProvider), session);
     final size = state.sizeBytes;
     if (ForceAudioLimits.isTooLarge(size)) {
       state = state.copyWith(
@@ -221,8 +264,11 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
       );
       final asset = await _uploader.upload(
         media,
-        onProgress: (p) => state = state.copyWith(progress: p),
+        onProgress: (p) {
+          if (sameSession()) state = state.copyWith(progress: p);
+        },
       );
+      if (!sameSession()) return;
 
       state = state.copyWith(stage: ComposerStage.sending, progress: 1);
 
@@ -232,9 +278,11 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
         sizeBytes: asset.bytes,
         durationMs: state.elapsedMs,
       );
+      if (!sameSession()) return;
 
       final conversation = ref.read(conversationsProvider.notifier);
       await conversation.refresh();
+      if (!sameSession()) return;
       if (sent == null) {
         state = state.copyWith(
           stage: ComposerStage.failed,
@@ -250,9 +298,14 @@ class ForceAudioComposerController extends Notifier<ForceAudioComposerState> {
         data: {'bytes': asset.bytes, 'ms': state.elapsedMs},
       );
     } on AppFailure catch (e) {
-      state = state.copyWith(stage: ComposerStage.failed, error: e.userMessage);
+      if (sameSession()) {
+        state = state.copyWith(
+          stage: ComposerStage.failed,
+          error: e.userMessage,
+        );
+      }
     } finally {
-      state = state.copyWith(progress: 0);
+      if (sameSession()) state = state.copyWith(progress: 0);
     }
   }
 

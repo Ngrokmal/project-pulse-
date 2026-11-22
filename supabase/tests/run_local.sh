@@ -36,6 +36,17 @@ for m in supabase/migrations/*.sql; do
   $PSQL -d "$DB" -f "$m"
 done
 
+# Verify policy capability preflight fails closed under an unauthorized role.
+preflight_log=$(mktemp /tmp/pulse-storage-preflight-XXXXXX)
+if printf "set role authenticated;\n\\i supabase/migrations/0020_avatar_storage_control.sql\n" | $PSQL -d "$DB" >"$preflight_log" 2>&1; then
+  echo 'FAIL: storage policy preflight accepted unauthorized role'; rm -f "$preflight_log"; exit 1
+fi
+if ! grep -q 'storage.objects policy management permission required' "$preflight_log"; then
+  echo 'FAIL: preflight failed for an unexpected reason'; cat "$preflight_log"; rm -f "$preflight_log"; exit 1
+fi
+rm -f "$preflight_log"
+echo 'storage policy preflight rejected unauthorized role'
+
 # Supabase grants ALL on public tables to service_role by default (it also has
 # BYPASSRLS). Mirror that here so the shipped policies are tested as they will
 # actually run in production.
@@ -43,7 +54,7 @@ $PSQL -d "$DB" -c "grant all on all tables in schema public to service_role"
 $PSQL -d "$DB" -c "grant all on all sequences in schema public to service_role"
 
 echo "→ RLS tests"
-for f in supabase/tests/10_rls_test.sql supabase/tests/23_live_suspension_test.sql supabase/tests/40_live_chat_test.sql supabase/tests/50_force_audio_test.sql supabase/tests/60_groups_test.sql supabase/tests/70_calls_test.sql supabase/tests/80_rls_pentest.sql supabase/tests/90_presence_test.sql supabase/tests/91_friends_from_chats_test.sql; do
+for f in supabase/tests/10_rls_test.sql supabase/tests/23_live_suspension_test.sql supabase/tests/24_admin_foundation_test.sql supabase/tests/25_expiry_transition_test.sql supabase/tests/26_group_and_expiry_contract.sql supabase/tests/27_admin_api_test.sql supabase/tests/28_avatar_storage_controls_test.sql supabase/tests/40_live_chat_test.sql supabase/tests/50_force_audio_test.sql supabase/tests/60_groups_test.sql supabase/tests/70_calls_test.sql supabase/tests/80_rls_pentest.sql supabase/tests/90_presence_test.sql supabase/tests/91_friends_from_chats_test.sql; do
   [ -f "$f" ] || continue
   echo "  · $f"
   # ON_ERROR_STOP makes psql exit non-zero as soon as an assertion block raises.

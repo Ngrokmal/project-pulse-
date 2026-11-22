@@ -32,11 +32,14 @@ class SupabaseChatRepository implements ChatRepository {
   Future<List<Conversation>> conversations() async {
     final me = _me;
     try {
+      final revisionField = const bool.fromEnvironment('PULSE_JOURNAL_SYNC')
+          ? 'last_read_revision,'
+          : '';
       final rows = await _client
           .from('conversations')
           .select(
             'id, kind, title, last_message_at, last_message_preview, last_message_sender, '
-            'conversation_members(user_id, role, last_read_at, '
+            'conversation_members(user_id, role, last_read_at, $revisionField '
             'profiles(id, display_name, username, avatar_url, photo_visible))',
           )
           .order('last_message_at', ascending: false, nullsFirst: false);
@@ -60,9 +63,13 @@ class SupabaseChatRepository implements ChatRepository {
           .select()
           .eq('conversation_id', conversationId)
           .order('created_at', ascending: false)
+          .order('id', ascending: false)
           .limit(limit);
       final list = rows.map(Message.fromMap).toList()
-        ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        ..sort((a, b) {
+          final time = a.createdAt.compareTo(b.createdAt);
+          return time != 0 ? time : a.id.compareTo(b.id);
+        });
       return list;
     } on PostgrestException catch (e) {
       throw _map(e, 'messages');
@@ -113,12 +120,13 @@ class SupabaseChatRepository implements ChatRepository {
     } else if (mediaUrl == null || mediaUrl.isEmpty) {
       throw const ValidationFailure('media', 'Upload finished without a URL.');
     }
+    final senderId = _me;
     try {
       final row = await _client
           .from('messages')
           .insert({
             'conversation_id': conversationId,
-            'sender_id': _me,
+            'sender_id': senderId,
             'kind': messageKindToDb(kind),
             'body': kind == MessageKind.text ? body.trim() : null,
             'media_url': mediaUrl,
@@ -131,16 +139,31 @@ class SupabaseChatRepository implements ChatRepository {
           .single();
       return Message.fromMap(row);
     } on PostgrestException catch (e) {
-      // 23505 on (conversation_id, client_id) means the outbox retried a row the
-      // server already stored — fetch it instead of failing the send.
+      // Recover only the original sender's matching payload. A different row
+      // with the same client id must not be misreported as this send succeeding.
       if (e.code == '23505') {
-        final existing = await _client
-            .from('messages')
-            .select()
-            .eq('conversation_id', conversationId)
-            .eq('client_id', clientId)
-            .maybeSingle();
-        if (existing != null) return Message.fromMap(existing);
+        try {
+          final existing = await _client
+              .from('messages')
+              .select()
+              .eq('conversation_id', conversationId)
+              .eq('client_id', clientId)
+              .eq('sender_id', senderId)
+              .maybeSingle();
+          if (existing != null &&
+              existing['kind'] == messageKindToDb(kind) &&
+              existing['body'] ==
+                  (kind == MessageKind.text ? body.trim() : null) &&
+              existing['media_url'] == mediaUrl &&
+              existing['media_name'] == mediaName &&
+              existing['media_bytes'] == mediaBytes &&
+              existing['duration_ms'] == durationMs) {
+            return Message.fromMap(existing);
+          }
+        } on PostgrestException catch (lookupError) {
+          throw _map(lookupError, 'resolve_duplicate_message');
+        }
+        throw const ServerFailure(statusCode: 409, safeCode: 'duplicate');
       }
       throw _map(e, 'send_message');
     }
@@ -400,13 +423,29 @@ class SupabaseChatRepository implements ChatRepository {
         text.contains('host lookup')) {
       return NetworkFailure(detail: '${e.code}: ${e.message}');
     }
+    final code = e.code ?? '';
+    final httpStatus = int.tryParse(code);
+    if (httpStatus != null && httpStatus >= 400 && httpStatus <= 599) {
+      return ServerFailure(
+        statusCode: httpStatus,
+        safeCode: 'http_$httpStatus',
+      );
+    }
+    if (code.startsWith('22') || code.startsWith('23')) {
+      return ServerFailure(statusCode: 400, safeCode: code);
+    }
     return switch (e.code) {
       // The database's own refuse-to-write signal (migrations/0016). It is not
       // a retryable error: the account is on hold and the app has to say so.
       'PULSE' => const AccountSuspendedFailure(),
+      'PCTRL' when text.contains('message_send_disabled') =>
+        const AdminControlFailure('message_send_disabled'),
       '42501' => const ServerFailure(statusCode: 403, safeCode: 'not_allowed'),
-      '23505' => const ServerFailure(safeCode: 'duplicate'),
-      'PGRST116' => const ServerFailure(safeCode: 'not_found'),
+      '28000' || '28P01' => const AuthFailure(
+        'Please sign in again.',
+        kind: AuthFailureKind.invalidCredentials,
+      ),
+      'PGRST116' => const ServerFailure(statusCode: 404, safeCode: 'not_found'),
       _ => ServerFailure(safeCode: e.code ?? 'chat_error'),
     };
   }

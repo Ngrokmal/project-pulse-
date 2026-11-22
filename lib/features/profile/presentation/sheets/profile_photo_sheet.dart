@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../core/error/app_failure.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../auth/application/auth_controller.dart';
+import '../../../error_messages/application/error_message_resolver.dart';
 import '../../application/photo_studio_controller.dart';
 import '../../data/profile_photo_picker.dart';
 import '../../domain/profile.dart';
@@ -30,6 +32,21 @@ class ProfilePhotoSheet extends ConsumerStatefulWidget {
 class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
   final ProfilePhotoPicker _picker = ProfilePhotoPicker();
   bool _picking = false;
+  String? _errorOverride;
+  int _errorRequest = 0;
+
+  void _clearResolvedError() {
+    _errorRequest++;
+    setState(() => _errorOverride = null);
+  }
+
+  Future<void> _resolveFailure(AppFailure failure) async {
+    final request = ++_errorRequest;
+    final message = await resolveErrorMessage(ref, failure);
+    if (mounted && request == _errorRequest) {
+      setState(() => _errorOverride = message);
+    }
+  }
 
   PhotoStudioController get _studio => ref.read(photoStudioProvider.notifier);
 
@@ -49,6 +66,7 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
 
   Future<void> _pick(PhotoSource source) async {
     if (_picking) return;
+    _clearResolvedError();
     setState(() => _picking = true);
     try {
       final picked = source == PhotoSource.camera
@@ -72,17 +90,21 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
   Future<void> _save() async {
     final userId = _userId;
     if (userId == null) return;
+    _clearResolvedError();
     final failure = await _studio.save(userId: userId);
     if (!mounted) return;
     if (failure == null) {
       Navigator.of(context).pop(true);
       PulseToast.show(context, 'Photo updated');
+    } else {
+      await _resolveFailure(failure);
     }
   }
 
   Future<void> _remove() async {
     final userId = _userId;
     if (userId == null) return;
+    _clearResolvedError();
     final failure = await _studio.remove(
       userId: userId,
       existingUrl: widget.profile.avatarUrl,
@@ -91,6 +113,8 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
     if (failure == null) {
       Navigator.of(context).pop(true);
       PulseToast.show(context, 'Back to your initials');
+    } else {
+      await _resolveFailure(failure);
     }
   }
 
@@ -203,7 +227,7 @@ class _ProfilePhotoSheetState extends ConsumerState<ProfilePhotoSheet> {
                 ),
                 if (state.error != null) ...[
                   const SizedBox(height: 12),
-                  _ErrorLine(message: state.error!),
+                  _ErrorLine(message: _errorOverride ?? state.error!),
                 ],
                 const SizedBox(height: 16),
                 SizedBox(

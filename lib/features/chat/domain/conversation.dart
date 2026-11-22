@@ -78,6 +78,7 @@ class Conversation {
     this.memberCount = 0,
     this.myRole,
     this.peerLastReadAt,
+    this.peerLastReadRevision,
   });
 
   final String id;
@@ -94,6 +95,7 @@ class Conversation {
   /// When the other participant last read this conversation. The only honest
   /// source of the "seen" tick; null when unknown (groups, or no row yet).
   final DateTime? peerLastReadAt;
+  final int? peerLastReadRevision;
 
   bool get isGroup => kind == 'group';
 
@@ -153,6 +155,9 @@ class Conversation {
       peer: peer == null
           ? const ChatPeer(id: '', displayName: 'Pulse user')
           : ChatPeer.fromMap(peer),
+      peerLastReadRevision: otherMembers.isEmpty
+          ? null
+          : (otherMembers.first['last_read_revision'] as num?)?.toInt(),
       peerLastReadAt: peerReadRaw == null
           ? null
           : DateTime.parse(peerReadRaw).toLocal(),

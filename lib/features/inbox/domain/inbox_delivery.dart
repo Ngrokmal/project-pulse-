@@ -15,6 +15,7 @@ enum InboxDelivery { pending, sent, seen, failed }
 InboxDelivery resolveInboxDelivery(
   Message message, {
   DateTime? peerLastReadAt,
+  int? peerLastReadRevision,
 }) {
   switch (message.delivery) {
     case DeliveryState.pending:
@@ -22,6 +23,13 @@ InboxDelivery resolveInboxDelivery(
     case DeliveryState.failed:
       return InboxDelivery.failed;
     case DeliveryState.sent:
+      if (peerLastReadRevision != null) {
+        final created = message.creationRevision;
+        return created != null && created <= peerLastReadRevision
+            ? InboxDelivery.seen
+            : InboxDelivery.sent;
+      }
+      // Legacy peers only expose a timestamp, which cannot prove gap-safe reads.
       if (peerLastReadAt != null &&
           !message.createdAt.isAfter(peerLastReadAt)) {
         return InboxDelivery.seen;
