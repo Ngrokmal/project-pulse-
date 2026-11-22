@@ -10,6 +10,7 @@ import '../../chat/application/chat_controller.dart';
 import '../../chat/domain/conversation.dart';
 import '../../chat/domain/message.dart';
 import '../../chat/presentation/group_info_sheet.dart';
+import '../../error_messages/application/error_message_resolver.dart';
 import '../../force_audio/presentation/force_audio_sheet.dart';
 import '../../media/data/file_picker_source.dart';
 import '../../media/domain/media_asset.dart';
@@ -125,11 +126,29 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
       await chat.send(text);
       _scrollToLatest();
     } on AppFailure catch (failure) {
-      // Never eat a draft: put the text back where the user left it.
-      _input.text = text;
+      if (!mounted) return;
+      // Preserve both the failed text and anything typed while the send ran.
+      final newerDraft = _input.text;
+      _input.text = newerDraft.isEmpty ? text : '$text\n$newerDraft';
+      final message = await resolveErrorMessage(ref, failure);
       if (mounted) {
         ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(failure.userMessage)));
+            .showSnackBar(SnackBar(content: Text(message)));
+      }
+    }
+  }
+
+  Future<void> _retryFailed() async {
+    try {
+      await ref
+          .read(chatThreadProvider(widget.conversationId).notifier)
+          .retryFailed();
+    } on AppFailure catch (failure) {
+      if (!mounted) return;
+      final message = await resolveErrorMessage(ref, failure);
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(message)));
       }
     }
   }
@@ -210,9 +229,11 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
       final id = await ref.read(
         startCallProvider((conversationId: conversation.id, kind: kind)).future,
       );
-      router.push('/call/$id');
+      if (mounted) router.push('/call/$id');
     } on AppFailure catch (failure) {
-      messenger.showSnackBar(SnackBar(content: Text(failure.userMessage)));
+      if (!mounted) return;
+      final message = await resolveErrorMessage(ref, failure);
+      if (mounted) messenger.showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -271,6 +292,7 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
       messages,
       myId: myId,
       peerLastReadAt: isGroup ? null : conversation?.peerLastReadAt,
+      peerLastReadRevision: isGroup ? null : conversation?.peerLastReadRevision,
     );
 
     // Realtime arrivals: follow them when the user is at the bottom, count them
@@ -356,12 +378,7 @@ class _PersonalInboxScreenState extends ConsumerState<PersonalInboxScreen> {
                         peerTyping: state?.peerTyping ?? false,
                         controller: _scroll,
                         now: DateTime.now(),
-                        onRetry: () => ref
-                            .read(
-                              chatThreadProvider(widget.conversationId)
-                                  .notifier,
-                            )
-                            .retryFailed(),
+                        onRetry: _retryFailed,
                         onDelete: _confirmDelete,
                         myName: myName,
                         peerName: conversation?.displayName,

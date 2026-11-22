@@ -80,14 +80,25 @@ class AccountLockController extends Notifier<AccountHold?> {
   }
 
   Future<void> endSession() async {
-    // A held account's device keeps nothing: the cached archive and the queued
-    // sends are cleared before the tokens are, so a phone that is put down
-    // mid-logout cannot be picked up later and read.
+    // Clear this account's scoped cache and queued sends before signing out.
+    // Owner-less legacy entries are intentionally retained for safe recovery;
+    // this is not a guarantee that all historical local data is erased.
+    final auth = ref.read(authControllerProvider);
+    final userId = auth is AuthSignedIn ? auth.user.id : null;
     try {
-      await ChatLocalStore.instance?.clear();
+      if (userId != null) {
+        await ChatLocalStore.instance?.forUser(userId).clear();
+      }
     } catch (_) {
       // A cache that will not clear must not stop the logout.
     }
+    bool sameAccount() {
+      if (!ref.mounted || userId == null) return false;
+      final current = ref.read(authControllerProvider);
+      return current is AuthSignedIn && current.user.id == userId;
+    }
+
+    if (!sameAccount()) return;
     // Push first: it is the only call that needs the token row to still exist
     // (a suspended account's row is already deleted server-side, so this is
     // best-effort by design and must never block the sign-out).
@@ -96,6 +107,7 @@ class AccountLockController extends Notifier<AccountHold?> {
     } catch (_) {
       // Sign-out is not allowed to fail because a token could not be retired.
     }
+    if (!sameAccount()) return;
     try {
       await ref.read(authControllerProvider.notifier).signOut();
     } catch (_) {
@@ -118,6 +130,15 @@ class AccountStatusController extends AsyncNotifier<AccountStatusInfo?> {
   StreamSubscription<AccountStatusInfo>? _changes;
   Timer? _poll;
   String? _userId;
+  int _generation = 0;
+
+  bool _isCurrent(String userId, int generation) {
+    if (!ref.mounted || generation != _generation || _userId != userId) {
+      return false;
+    }
+    final auth = ref.read(authControllerProvider);
+    return auth is AuthSignedIn && auth.user.id == userId;
+  }
 
   @override
   Future<AccountStatusInfo?> build() async {
@@ -127,6 +148,7 @@ class AccountStatusController extends AsyncNotifier<AccountStatusInfo?> {
     if (auth is! AuthSignedIn) return null;
     final userId = auth.user.id;
     _userId = userId;
+    final generation = _generation;
     final repo = ref.read(accountStatusRepositoryProvider);
 
     // A phone coming back from the background asks immediately: the hold may
@@ -138,7 +160,8 @@ class AccountStatusController extends AsyncNotifier<AccountStatusInfo?> {
     ref.onDispose(_stopWatching);
 
     final info = await repo.fetchMine(userId);
-    _startWatching(userId, repo);
+    if (!_isCurrent(userId, generation)) return null;
+    _startWatching(userId, generation, repo);
     _evaluate(info);
     return info;
   }
@@ -148,31 +171,35 @@ class AccountStatusController extends AsyncNotifier<AccountStatusInfo?> {
   Future<AccountStatusInfo?> check() async {
     final userId = _userId;
     if (userId == null) return null;
+    final generation = _generation;
     try {
       final info = await ref
           .read(accountStatusRepositoryProvider)
           .fetchMine(userId);
+      if (!_isCurrent(userId, generation)) return null;
       _evaluate(info);
       // Keep the cached value in step without flashing a loading state.
       if (!state.isLoading) state = AsyncData(info);
       return info;
     } catch (_) {
       // A failed check changes nothing: the last known truth stands.
-      return state.value;
+      return _isCurrent(userId, generation) ? state.value : null;
     }
   }
 
   Future<void> refresh() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final generation = _generation;
     state = const AsyncLoading();
-    state = await AsyncValue.guard(() async {
-      final auth = ref.read(authControllerProvider);
-      if (auth is! AuthSignedIn) return null;
+    final result = await AsyncValue.guard(() async {
       final info = await ref
           .read(accountStatusRepositoryProvider)
-          .fetchMine(auth.user.id);
-      _evaluate(info);
+          .fetchMine(userId);
+      if (_isCurrent(userId, generation)) _evaluate(info);
       return info;
     });
+    if (_isCurrent(userId, generation)) state = result;
   }
 
   void _evaluate(AccountStatusInfo info) {
@@ -180,8 +207,14 @@ class AccountStatusController extends AsyncNotifier<AccountStatusInfo?> {
     unawaited(ref.read(accountLockProvider.notifier).lock(info));
   }
 
-  void _startWatching(String userId, AccountStatusRepository repo) {
-    _changes = repo.watch(userId).listen(_evaluate, onError: (Object _) {});
+  void _startWatching(
+    String userId,
+    int generation,
+    AccountStatusRepository repo,
+  ) {
+    _changes = repo.watch(userId).listen((info) {
+      if (_isCurrent(userId, generation)) _evaluate(info);
+    }, onError: (Object _) {});
     _poll = Timer.periodic(
       accountStatusPollInterval,
       (_) => unawaited(check()),
@@ -189,6 +222,8 @@ class AccountStatusController extends AsyncNotifier<AccountStatusInfo?> {
   }
 
   void _stopWatching() {
+    _generation++;
+    _userId = null;
     unawaited(_changes?.cancel());
     _changes = null;
     _poll?.cancel();

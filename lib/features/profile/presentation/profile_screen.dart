@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/widgets/state_views.dart';
+import '../../admin/application/admin_providers.dart';
 import '../../auth/application/auth_controller.dart';
 import '../../chat/application/chat_controller.dart';
 import '../../chat/domain/conversation.dart';
@@ -94,6 +95,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileState = ref.watch(profileControllerProvider);
+    // This controls only visibility; every admin operation is authorised again
+    // by the server, even if someone modifies the client to show the entry.
+    ref.watch(adminAccessProvider);
     final view = ref.watch(profileViewProvider);
     final profile = profileState.value;
 
@@ -401,6 +405,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         actions: [
           for (final action in ProfileScopePlan.moreSheet(mode))
             _sheetAction(action),
+          if (ref.read(adminAccessProvider).value == true)
+            SheetAction(
+              icon: Icons.admin_panel_settings_outlined,
+              title: 'Administration',
+              subtitle: 'Manage account access',
+              onTap: () {
+                if (mounted) context.push('/admin');
+              },
+            ),
         ],
       ),
     );

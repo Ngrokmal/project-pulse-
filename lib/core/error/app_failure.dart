@@ -176,6 +176,28 @@ class AccountSuspendedFailure extends AppFailure {
   bool get isRetryable => false;
 }
 
+/// A server-authoritative per-user feature control rejected the action.
+class AdminControlFailure extends AppFailure {
+  const AdminControlFailure(this.controlCode);
+  final String controlCode;
+
+  @override
+  String get code => controlCode;
+
+  @override
+  String get userMessage => switch (controlCode) {
+    'message_send_disabled' => 'Messaging is not available for this account.',
+    'call_start_disabled' =>
+      'Starting calls is not available for this account.',
+    'profile_photo_change_disabled' =>
+      'Changing the profile photo is not available for this account.',
+    _ => 'This action is not available for this account.',
+  };
+
+  @override
+  bool get isRetryable => false;
+}
+
 /// The account already has an appeal waiting.
 ///
 /// The server enforces one open appeal per account (a partial unique index), so

@@ -274,6 +274,23 @@ class SupabaseProfileRepository implements ProfileRepository {
       // StorageException carries a *string* status ("413"), unlike PostgREST's
       // int; parse it so the retry policy (>=500 retries) still works.
       final status = int.tryParse('${e.statusCode}');
+      if (status == 403) {
+        // A Storage RLS denial does not carry our trigger's SQLSTATE. Ask the
+        // server about this account's photo policy; if unavailable (including
+        // older servers), keep the generic Storage error instead of guessing.
+        bool? photoAllowed;
+        try {
+          final value = await _client
+              .rpc('pulse_own_photo_change_allowed')
+              .timeout(const Duration(seconds: 2));
+          if (value is bool) photoAllowed = value;
+        } catch (_) {
+          // The existing safe Storage fallback is retained.
+        }
+        if (photoAllowed == false) {
+          throw const AdminControlFailure('profile_photo_change_disabled');
+        }
+      }
       throw ServerFailure(statusCode: status, safeCode: 'avatar_upload_failed');
     } on AppFailure {
       rethrow;
@@ -560,6 +577,8 @@ class SupabaseProfileRepository implements ProfileRepository {
     if (e is PostgrestException) {
       _log.warning(op, error: '${e.code}');
       return switch (e.code) {
+        'PCTRL' when e.message == 'profile_photo_change_disabled' =>
+          const AdminControlFailure('profile_photo_change_disabled'),
         // 23505 unique_violation → username already taken
         '23505' => const ValidationFailure(
           'username',

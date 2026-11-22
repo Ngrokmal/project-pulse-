@@ -152,6 +152,9 @@ class SupabaseCallRepository implements CallRepository {
   AppFailure _map(PostgrestException e, String op) {
     _log.warning('call_$op', error: '${e.code}');
     final text = e.message.toLowerCase();
+    if (e.code == 'PCTRL' && e.message == 'call_start_disabled') {
+      return const AdminControlFailure('call_start_disabled');
+    }
     for (final reason in const [
       'already_in_call',
       'peer_busy',
